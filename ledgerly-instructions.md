@@ -28,25 +28,147 @@ Ledgerly is a comprehensive personal expense management platform that helps user
 - OpenAI GPT-4 (Transaction categorization)
 - Supabase Storage (File storage)
 
-## Implementation Order
+# Detailed Implementation Order
 
-### Phase 1: Foundation (Week 1)
-1. Database schema setup
-2. Authentication implementation
-3. Basic layout & navigation
-4. File storage configuration
+## Phase 1: Core UI & Navigation Setup
+
+### Step 1: Project Structure & Layout (Week 1, Days 1-2)
+- `/app/layout.tsx` - Root layout with ClerkProvider and SidebarProvider
+- `/app/page.tsx` - Dashboard page
+- `/app/categories/page.tsx` - Categories management page
+- `/app/transactions/page.tsx` - Transactions page
+- `/app/recurring-transactions/page.tsx` - Recurring transactions page
+
+Base routes:
+```
+/                     -> Dashboard
+/categories           -> Categories Management
+/transactions         -> Transactions List
+/recurring-transactions -> Recurring Transactions
+```
+
+### Step 2: Core Components (Week 1, Days 2-3)
+# Core Components To Create
+
+## Layout Components
+1. `/components/app/app-sidebar.tsx`
+   - Uses shadcn Sidebar
+   - Fixed navigation items:
+     - Dashboard
+     - Transactions
+     - Categories
+     - Recurring Transactions
+   - User profile section with Clerk UserButton
+
+## Data Display Components
+2. `/components/app/transactions-table.tsx`
+   - Wraps shadcn DataTable
+   - Fixed columns configuration
+   - Transaction-specific actions
+   - Export functionality
+
+3. `/components/app/categories-table.tsx`
+   - Wraps shadcn DataTable
+   - Category-specific columns
+   - Icon and color display
+   - Usage count
+
+4. `/components/app/recurring-table.tsx`
+   - Wraps shadcn DataTable
+   - Recurring-specific columns
+   - Frequency display
+   - Next occurrence
+
+## Chart Wrappers
+5. `/components/app/spending-chart.tsx`
+   - Wraps Recharts BarChart
+   - Monthly spending visualization
+   - Income vs Expenses
+
+6. `/components/app/category-distribution.tsx`
+   - Wraps Recharts PieChart
+   - Category spending breakdown
+   - Fixed calculation logic
+
+## Forms
+7. `/components/app/transaction-form.tsx`
+   - Wraps shadcn Dialog, Form, Select
+   - All transaction fields
+   - Form validation
+   - Submit logic
+
+8. `/components/app/upload-form.tsx`
+   - Wraps shadcn Dialog, Form
+   - File upload handling
+   - Progress display
+
+## Container Components
+9. `/components/app/metrics-cards.tsx`
+   - Grid of shadcn Cards
+   - Fixed metrics:
+     - Total Income
+     - Total Expenses
+     - Net Balance
+     - Top Category
+
+10. `/components/app/filters-bar.tsx`
+    - Groups shadcn DateRangePicker, Select
+    - Common filter options
+    - Clear functionality
+
+### Step 3: Dashboard Implementation (Week 1, Days 4-5)
+1. Summary Cards:
+   - Total Income
+   - Total Expenses
+   - Net Balance
+   - Most Active Category
+
+2. Charts:
+   - Monthly Spending (Bar Chart)
+   - Category Distribution (Pie Chart)
+   - Balance Trends (Line Chart)
+
+3. Recent Transactions Table:
+   - Sortable columns
+   - Basic filtering
+   - Pagination
+
+4. Sidebar Navigation:
+   - Dashboard
+   - Transactions
+   - Categories
+   - Recurring Transactions
+
+### Step 4: Integration & Testing (Week 1, Day 5)
+1. Route Testing:
+   - Navigation between pages
+   - Sidebar state management
+   - Responsive layout testing
+
+2. Component Integration:
+   - Chart data flow
+   - Table functionality
+   - Form submissions
+
+## Next Phases Preview:
 
 ### Phase 2: Core Features (Week 2)
-1. File upload system
-2. Transaction processing pipeline
-3. Basic transaction management
-4. Category system implementation
+- Authentication implementation
+- File upload system
+- Transaction management
+- Category system
 
 ### Phase 3: Advanced Features (Week 3)
-1. Dashboard & analytics
-2. Recurring transactions
-3. Data visualization
-4. Export functionality
+- Analytics & reports
+- Recurring transactions
+- Export functionality
+- Advanced filtering
+
+### Phase 4: Polish & Optimization (Week 4)
+- Performance optimization
+- Error handling
+- Loading states
+- Final testing
 
 ## Database Schema
 
