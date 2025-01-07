@@ -1,33 +1,39 @@
-"use client"
+"use client";
 
-import { Sidebar, SidebarContent, SidebarHeader, SidebarFooter, SidebarRail } from "../ui/sidebar";
-import { LucideIcon, Home, List, Tag, Repeat } from "lucide-react";
-import { UserButton } from "@clerk/nextjs";
+import { Sidebar, SidebarContent, SidebarGroup, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
+import { Home, List, Repeat, Tag } from "lucide-react";
 
+// Define navigation items
 const navItems = [
-  { title: "Dashboard", icon: Home, url: "/" },
-  { title: "Transactions", icon: List, url: "/transactions" },
-  { title: "Categories", icon: Tag, url: "/categories" },
-  { title: "Recurring Transactions", icon: Repeat, url: "/recurring-transactions" },
+  { title: "Dashboard", url: "/dashboard", icon: Home },
+  { title: "Transactions", url: "/transactions", icon: List },
+  { title: "Categories", url: "/categories", icon: Tag },
+  { title: "Recurring Transactions", url: "/recurring-transactions", icon: Repeat },
 ];
 
 export function AppSidebar() {
+  console.log("Rendering AppSidebar");
   return (
-    <Sidebar collapsible="icon">
-      <SidebarHeader>
-        <UserButton afterSignOutUrl="/" />
-      </SidebarHeader>
+    <Sidebar className="w-[15vw] bg-white">
       <SidebarContent>
-        {navItems.map((item) => (
-          <a key={item.title} href={item.url} className="flex items-center gap-2 p-2">
-            <item.icon className="w-5 h-5" />
-            <span>{item.title}</span>
-          </a>
-        ))}
+        <div className="p-4 mb-8"> {/* Space for Logo */}
+          <img src="/path/to/logo.png" alt="Logo" className="w-16 h-16 mx-auto" />
+        </div>
+        <SidebarGroup>
+          <SidebarMenu>
+            {navItems.map((item) => (
+              <SidebarMenuItem key={item.title}>
+                <SidebarMenuButton asChild>
+                  <a href={item.url} className="flex items-center gap-2 p-2">
+                    <item.icon className="w-5 h-5" />
+                    <span>{item.title}</span>
+                  </a>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            ))}
+          </SidebarMenu>
+        </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter>
-        <SidebarRail />
-      </SidebarFooter>
     </Sidebar>
   );
 }

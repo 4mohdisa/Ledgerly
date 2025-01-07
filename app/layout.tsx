@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import { ClerkProvider } from '@clerk/nextjs';
-import { SidebarProvider } from '../components/ui/sidebar';
+import { SidebarProvider, SidebarTrigger } from '../components/ui/sidebar';
 import "./globals.css";
 
 const geistSans = localFont({
@@ -32,6 +32,7 @@ export default function RootLayout({
       >
         <ClerkProvider>
           <SidebarProvider>
+          <SidebarTrigger />
             {children}
           </SidebarProvider>
         </ClerkProvider>
