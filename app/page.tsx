@@ -1,7 +1,7 @@
 import { MetricsCards } from "@/components/app/metrics-cards";
 import { SpendingChart } from "@/components/app/charts/bar-chart-multiple";
 import { PieDonutChart } from "@/components/app/charts/pie-donut-chart";
-import { DataTable } from "@/components/app/tables/data-table";
+import { TransactionsTable } from "@/components/app/tables/transactions-table";
 import { AppSidebar } from "@/components/app/app-sidebar";
 
 export default function Dashboard() {
@@ -17,7 +17,7 @@ export default function Dashboard() {
           <PieDonutChart />
           {/* Placeholder for Balance Trends (Line Chart) */}
         </div>
-        <DataTable />
+        <TransactionsTable />
       </div>
     </div>
   );
