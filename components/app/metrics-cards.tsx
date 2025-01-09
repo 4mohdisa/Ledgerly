@@ -33,7 +33,7 @@ export function MetricsCards() {
         <div
           key={item.title}
         >
-          <Card className={`overflow-hidden transition-all duration-300 ease-in-out hover:shadow-lg`}>
+          <Card className={`overflow-hidden`}>
             <div className={`absolute inset-0 opacity-10`}></div>
             <CardHeader className="relative z-10">
               <CardTitle className="flex items-center text-lg font-semibold">
