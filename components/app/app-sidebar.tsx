@@ -10,7 +10,6 @@ import { Home, List, Repeat, Tag } from 'lucide-react';
 const navItems = [
   { title: "Dashboard", url: "/", icon: Home },
   { title: "Transactions", url: "/transactions", icon: List },
-  { title: "Categories", url: "/categories", icon: Tag },
   { title: "Recurring Transactions", url: "/recurring-transactions", icon: Repeat },
 ];
 

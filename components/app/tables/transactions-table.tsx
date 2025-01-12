@@ -36,29 +36,65 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
+import { cn } from "@/lib/utils"
+import { format } from "date-fns"
 
-import { transactions as initialTransactions } from "@/data/transactions"
+import { transactions } from "@/data/transactions"
+import { categories } from "@/data/categories"
 import { ConfirmationDialog } from "../confirmation-dialog"
 import { TransactionDialog } from "../transaction-dialog"
+import { DateRange } from "react-day-picker"
 
 interface Transaction {
-  id: string;
-  user_id: number;
-  name: string;
-  amount: number;
-  description?: string;
-  date: string;
-  file_id: number;
-  type: string;
-  account_type: string;
-  category_id: number;
-  recurring_frequency?: string;
-  created_at: string;
-  updated_at: string;
+  id: string
+  user_id: number
+  name: string
+  amount: number
+  description?: string
+  date: string
+  file_id: number
+  type: string
+  account_type: string
+  category_id: number
+  recurring_frequency?: string
+  created_at: string
+  updated_at: string
 }
 
-export function TransactionsTable() {
-  const [data, setData] = React.useState(initialTransactions)
+interface TransactionsTableProps {
+  showFilters?: boolean
+  showPagination?: boolean
+  showRowsCount?: boolean
+  itemsPerPage?: number
+  maxTransactions?: number
+  sortBy?: {
+    field: keyof Transaction
+    order: 'asc' | 'desc'
+  }
+  className?: string
+  dateRange?: DateRange | undefined
+  data: Transaction[]
+  onDelete?: (id: string) => void
+  onBulkDelete?: (ids: string[]) => void
+  onEdit?: (id: string, formData: any) => void
+  onBulkEdit?: (ids: string[], changes: Partial<Transaction>) => void
+}
+
+export function TransactionsTable({
+  showFilters = true,
+  showPagination = true,
+  showRowsCount = true,
+  itemsPerPage = 10,
+  maxTransactions,
+  sortBy,
+  className,
+  dateRange,
+  data,
+  onDelete,
+  onBulkDelete,
+  onEdit,
+  onBulkEdit,
+}: TransactionsTableProps) {
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
@@ -67,6 +103,10 @@ export function TransactionsTable() {
   const [editingTransaction, setEditingTransaction] = React.useState<Transaction | null>(null)
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = React.useState(false)
   const [transactionToDelete, setTransactionToDelete] = React.useState<string | null>(null)
+
+  const getCategoryName = (categoryId: number) => {
+    return categories.find(cat => cat.id === categoryId)?.name || 'Uncategorized'
+  }
 
   const columns: ColumnDef<Transaction>[] = [
     {
@@ -107,13 +147,15 @@ export function TransactionsTable() {
       accessorKey: "amount",
       header: ({ column }) => {
         return (
-          <Button
-            variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          >
-            Amount
-            <ArrowUpDown className="ml-2 h-4 w-4" />
-          </Button>
+          <div className="text-right">
+            <Button
+              variant="ghost"
+              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+            >
+              Amount
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          </div>
         )
       },
       cell: ({ row }) => {
@@ -129,8 +171,8 @@ export function TransactionsTable() {
       accessorKey: "category_id",
       header: "Category",
       cell: ({ row }) => {
-        const category = row.getValue("category_id") as number | undefined
-        return category ? <Badge>{category}</Badge> : null
+        const categoryId = row.getValue("category_id") as number
+        return <Badge>{getCategoryName(categoryId)}</Badge>
       },
     },
     {
@@ -151,7 +193,10 @@ export function TransactionsTable() {
           </Button>
         )
       },
-      cell: ({ row }) => <div>{row.getValue("date")}</div>,
+      cell: ({ row }) => {
+        const date = new Date(row.getValue("date"))
+        return <div>{format(date, 'MM/dd/yyyy')}</div>
+      },
     },
     {
       id: "actions",
@@ -171,7 +216,6 @@ export function TransactionsTable() {
               <DropdownMenuItem
                 onClick={() => {
                   navigator.clipboard.writeText(transaction.id)
-                  // You might want to add a toast notification here
                 }}
               >
                 Copy transaction ID
@@ -219,104 +263,98 @@ export function TransactionsTable() {
       rowSelection,
       globalFilter,
     },
+    initialState: {
+      pagination: {
+        pageSize: itemsPerPage,
+      },
+    },
   })
 
   const handleDeleteTransaction = (id: string) => {
-    setData(prevData => prevData.filter(transaction => transaction.id !== id))
+    onDelete?.(id)
     setIsConfirmDialogOpen(false)
     setTransactionToDelete(null)
   }
 
-  const handleEditTransaction = (formData: Omit<Transaction, 'id' | 'date' | 'user_id' | 'file_id' | 'created_at' | 'updated_at'> & { date: Date }) => {
+  const handleEditTransaction = (formData: any) => {
     if (editingTransaction) {
-      const updatedTransaction: Transaction = {
-        ...formData,
-        id: editingTransaction.id,
-        user_id: editingTransaction.user_id,
-        file_id: editingTransaction.file_id,
-        date: formData.date.toISOString(),
-        created_at: editingTransaction.created_at,
-        updated_at: new Date().toISOString()
-      };
-      // setData((prevData: Transaction[]) => prevData.map(transaction => 
-      //   transaction.id === updatedTransaction.id ? updatedTransaction : transaction
-      // ))
+      onEdit?.(editingTransaction.id, formData)
       setEditingTransaction(null)
     }
   }
 
-  const handleBulkDelete = () => {
-    const selectedIds = Object.keys(rowSelection)
-    setData(prevData => prevData.filter(transaction => !selectedIds.includes(transaction.id)))
-    setRowSelection({})
-  }
-
-  const handleBulkEditCategory = (newCategory: number) => {
-    const selectedIds = Object.keys(rowSelection)
-    setData(prevData => prevData.map(transaction => 
-      selectedIds.includes(transaction.id) ? {...transaction, category_id: newCategory} : transaction
-    ))
-    setRowSelection({})
-  }
-
   return (
-    <div className="w-full space-y-4">
-      <div className="flex items-center justify-between">
-        <Input
-          placeholder="Filter transactions..."
-          value={globalFilter}
-          onChange={(event) => setGlobalFilter(event.target.value)}
-          className="max-w-sm"
-        />
-        <div className="flex items-center space-x-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline">
-                Columns <ChevronDown className="ml-2 h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {table
-                .getAllColumns()
-                .filter((column) => column.getCanHide())
-                .map((column) => {
-                  return (
-                    <DropdownMenuCheckboxItem
-                      key={column.id}
-                      className="capitalize"
-                      checked={column.getIsVisible()}
-                      onCheckedChange={(value) =>
-                        column.toggleVisibility(!!value)
-                      }
-                    >
-                      {column.id}
-                    </DropdownMenuCheckboxItem>
-                  )
-                })}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline">
-                Bulk Actions <ChevronDown className="ml-2 h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              <DropdownMenuItem onClick={handleBulkDelete}>
-                Delete Selected
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleBulkEditCategory(1)}>
-                Set Category to 1
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleBulkEditCategory(2)}>
-                Set Category to 2
-              </DropdownMenuItem>
-              {/* Add more categories as needed */}
-            </DropdownMenuContent>
-          </DropdownMenu>
+    <div className={cn("w-full space-y-4", className)}>
+      {showFilters && (
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <Input
+            placeholder="Filter transactions..."
+            value={globalFilter}
+            onChange={(event) => setGlobalFilter(event.target.value)}
+            className="max-w-sm"
+          />
+          <div className="flex flex-col md:flex-row gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline">
+                  Columns <ChevronDown className="ml-2 h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {table
+                  .getAllColumns()
+                  .filter((column) => column.getCanHide())
+                  .map((column) => {
+                    return (
+                      <DropdownMenuCheckboxItem
+                        key={column.id}
+                        className="capitalize"
+                        checked={column.getIsVisible()}
+                        onCheckedChange={(value) =>
+                          column.toggleVisibility(!!value)
+                        }
+                      >
+                        {column.id}
+                      </DropdownMenuCheckboxItem>
+                    )
+                  })}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline">
+                  Bulk Actions <ChevronDown className="ml-2 h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => {
+                  const selectedIds = Object.keys(rowSelection)
+                  onBulkDelete?.(selectedIds)
+                  setRowSelection({})
+                }}>
+                  Delete Selected
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>Change Category</DropdownMenuLabel>
+                {categories.map((category) => (
+                  <DropdownMenuItem
+                    key={category.id}
+                    onClick={() => {
+                      const selectedIds = Object.keys(rowSelection)
+                      onBulkEdit?.(selectedIds, { category_id: category.id })
+                      setRowSelection({})
+                    }}
+                  >
+                    {category.name}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
-      </div>
-      <div className="rounded-md border">
+      )}
+      
+      <div className="rounded-md border overflow-x-auto">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
@@ -360,42 +398,50 @@ export function TransactionsTable() {
           </TableBody>
         </Table>
       </div>
-      <div className="flex items-center justify-end space-x-2 py-4">
-        <div className="flex-1 text-sm text-muted-foreground">
-          {table.getFilteredSelectedRowModel().rows.length} of{" "}
-          {table.getFilteredRowModel().rows.length} row(s) selected.
+
+      {(showPagination || showRowsCount) && (
+        <div className="flex items-center justify-end space-x-2 py-4">
+          {showRowsCount && (
+            <div className="flex-1 text-sm text-muted-foreground">
+              {table.getFilteredSelectedRowModel().rows.length} of{" "}
+              {table.getFilteredRowModel().rows.length} row(s) selected.
+            </div>
+          )}
+          {showPagination && (
+            <div className="space-x-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => table.previousPage()}
+                disabled={!table.getCanPreviousPage()}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => table.nextPage()}
+                disabled={!table.getCanNextPage()}
+              >
+                Next
+              </Button>
+            </div>
+          )}
         </div>
-        <div className="space-x-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => table.previousPage()}
-            disabled={!table.getCanPreviousPage()}
-          >
-            Previous
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => table.nextPage()}
-            disabled={!table.getCanNextPage()}
-          >
-            Next
-          </Button>
-        </div>
-      </div>
+      )}
+
       <TransactionDialog
         isOpen={!!editingTransaction}
         onClose={() => setEditingTransaction(null)}
-        // onSubmit={handleEditTransaction}
+        onSubmit={handleEditTransaction}
         initialData={editingTransaction ? {
           ...editingTransaction,
           date: new Date(editingTransaction.date),
           category_id: editingTransaction.category_id.toString()
         } : undefined}
-        mode={editingTransaction ? 'edit' : 'create'} onSubmit={function (data: { name: string; amount: number; date: Date; type: string; account_type: string; category_id: string; description?: string | undefined; recurring_frequency?: string | undefined }): void {
-          throw new Error("Function not implemented.")
-        } }      />
+        mode="edit"
+      />
+
       <ConfirmationDialog
         isOpen={isConfirmDialogOpen}
         onClose={() => setIsConfirmDialogOpen(false)}
@@ -406,4 +452,3 @@ export function TransactionsTable() {
     </div>
   )
 }
-
