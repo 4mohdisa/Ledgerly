@@ -16,17 +16,28 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
-
-const chartData = [
-  { category: "Food", value: 400 },
-  { category: "Transport", value: 300 },
-  { category: "Utilities", value: 300 },
-  { category: "Entertainment", value: 200 },
-  { category: "Healthcare", value: 278 },
-  { category: "Others", value: 189 },
-];
+import { recurringTransactions } from "@/data/recurring-transactions";
 
 const COLORS = ["hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))", "hsl(var(--chart-5))", "hsl(var(--chart-6))"];
+
+// Process transactions data for the chart
+const processChartData = () => {
+  const categoryTotals = recurringTransactions.reduce((acc, transaction) => {
+    const category = transaction.category;
+    if (!acc[category]) {
+      acc[category] = 0;
+    }
+    acc[category] += transaction.amount;
+    return acc;
+  }, {} as Record<string, number>);
+
+  return Object.entries(categoryTotals).map(([category, value]) => ({
+    category,
+    value
+  }));
+};
+
+const chartData = processChartData();
 
 const chartConfig = {
   category: {
@@ -118,4 +129,3 @@ export function PieDonutChart() {
     </div>
   );
 }
-

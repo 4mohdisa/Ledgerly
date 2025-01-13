@@ -51,12 +51,16 @@ interface Transaction {
   name: string
   amount: number
   description?: string
-  date: string
-  file_id: number
+  date?: string
+  start_date?: string
+  end_date?: string
+  file_id?: number
   type: string
   account_type: string
   category_id: number
+  category_name: string
   recurring_frequency?: string
+  frequency?: string
   created_at: string
   updated_at: string
 }
@@ -78,6 +82,7 @@ interface TransactionsTableProps {
   onBulkDelete?: (ids: string[]) => void
   onEdit?: (id: string, formData: any) => void
   onBulkEdit?: (ids: string[], changes: Partial<Transaction>) => void
+  type?: 'recurring' | 'upcoming'
 }
 
 export function TransactionsTable({
@@ -94,6 +99,7 @@ export function TransactionsTable({
   onBulkDelete,
   onEdit,
   onBulkEdit,
+  type = 'upcoming'
 }: TransactionsTableProps) {
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
@@ -181,20 +187,24 @@ export function TransactionsTable({
       cell: ({ row }) => <div>{row.getValue("description")}</div>,
     },
     {
-      accessorKey: "date",
+      accessorKey: type === 'recurring' ? 'start_date' : 'date',
       header: ({ column }) => {
         return (
           <Button
             variant="ghost"
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
           >
-            Date
+            {type === 'recurring' ? 'Start Date' : 'Date'}
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
         )
       },
       cell: ({ row }) => {
-        const date = new Date(row.getValue("date"))
+        const dateValue = type === 'recurring' 
+          ? row.getValue("start_date") 
+          : row.getValue("date")
+        if (!dateValue) return null
+        const date = new Date(dateValue)
         return <div>{format(date, 'MM/dd/yyyy')}</div>
       },
     },

@@ -124,6 +124,7 @@ export default function TransactionsPage() {
         onClose={() => setIsAddTransactionOpen(false)}
         onSubmit={handleTransactionSubmit}
         mode="create"
+        transactionType="regular"
       />
     </div>
   )
