@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { Button } from "@/components/ui/button"
 import { Upload, Plus, Menu } from 'lucide-react'
 import { MetricsCards } from "@/components/app/metrics-cards"
@@ -26,6 +26,12 @@ import {
 import { MonthPicker } from '@/components/app/month-picker'
 import { transactions } from '@/data/transactions'
 
+// Define default date range outside the component
+const defaultDateRange = {
+  from: startOfMonth(new Date()),
+  to: endOfMonth(new Date())
+}
+
 export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true)
   const [isAddTransactionOpen, setIsAddTransactionOpen] = useState(false)
@@ -33,11 +39,7 @@ export default function Dashboard() {
   const [isBalanceDialogOpen, setIsBalanceDialogOpen] = useState(false)
   const [isEditingBalance, setIsEditingBalance] = useState(false)
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
-  const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    from: startOfMonth(new Date()),
-    to: endOfMonth(new Date())
-  })
-  const [transactionsList, setTransactionsList] = useState(transactions)
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(defaultDateRange)
 
   useEffect(() => {
     // Simulate loading time
@@ -78,10 +80,12 @@ export default function Dashboard() {
   }, [])
 
   const handleBulkEdit = useCallback((ids: string[], changes: Partial<any>) => {
-    setTransactionsList(prev => prev.map(transaction => 
+    setTransactionsList(prev => prev.map((transaction: { id: string }) => 
       ids.includes(transaction.id) ? { ...transaction, ...changes } : transaction
     ))
   }, [])
+
+  const dateRangeValue = useMemo(() => dateRange ?? defaultDateRange, [dateRange])
 
   return (
     <div className="flex h-screen">
@@ -140,19 +144,19 @@ export default function Dashboard() {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-3">
-                  <TransactionChart dateRange={dateRange} />
+                  <TransactionChart dateRange={dateRangeValue} />
               </div>
 
               <div className="lg:col-span-1">
-                  <NetBalanceChart dateRange={dateRange} />
+                  <NetBalanceChart dateRange={dateRangeValue} />
               </div>
 
               <div>
-                  <SpendingChart dateRange={dateRange} />
+                  <SpendingChart dateRange={dateRangeValue} />
               </div>
 
               <div>
-                  <PieDonutChart dateRange={dateRange} />
+                  <PieDonutChart dateRange={dateRangeValue} />
               </div>
             </div>
 
@@ -162,7 +166,7 @@ export default function Dashboard() {
               showPagination={false}
               showRowsCount={false}
               maxTransactions={7}
-              data={transactionsList}
+              data={transactions}
               onBulkEdit={handleBulkEdit}
               sortBy={{
                 field: "date",
@@ -181,9 +185,8 @@ export default function Dashboard() {
       <TransactionDialog
         isOpen={isAddTransactionOpen}
         onClose={() => setIsAddTransactionOpen(false)}
-        onSubmit={() => {}}
-        mode="create"
-      />
+        onSubmit={() => { } }
+        mode="create" transactionType={'recurring'}      />
       <UploadDialog 
         open={isUploadFileOpen}
         onOpenChange={setIsUploadFileOpen}
@@ -194,3 +197,7 @@ export default function Dashboard() {
 
 // Add console log for debugging
 console.log("Dashboard page rendered");
+function setTransactionsList(arg0: (prev: any) => any) {
+  throw new Error('Function not implemented.')
+}
+

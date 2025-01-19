@@ -69,7 +69,7 @@ export function NetBalanceChart() {
           config={chartConfig}
           className="aspect-[16/9] w-full"
         >
-          <ResponsiveContainer width="100%" height={400}>
+          <ResponsiveContainer>
             <LineChart
               data={chartData}
               margin={{

@@ -12,6 +12,26 @@ body {
   }
 }
 
+.cl-internal-13u79ez {
+  background: transparent !important;
+}
+
+.cl-internal-1dauvpw {
+  display: none !important;
+}
+
+.cl-internal-13lvar6 {
+  background: white !important;
+}
+
+.dev-banner {
+  display: none !important;
+}
+
+.cl-internal-1dauvpw {
+  display: none !important;
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;

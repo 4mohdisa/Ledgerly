@@ -44,6 +44,7 @@ import { categories } from "@/data/categories"
 import { ConfirmationDialog } from "../confirmation-dialog"
 import { TransactionDialog } from "../transaction-dialog"
 import { DateRange } from "react-day-picker"
+import { BulkCategoryChangeDialog } from "../bulk-category-change"
 
 interface Transaction {
   id: string
@@ -53,7 +54,7 @@ interface Transaction {
   description?: string
   date?: string
   start_date?: string
-  end_date?: string
+  end_date?: string | null
   file_id?: number
   type: string
   account_type: string
@@ -109,6 +110,7 @@ export function TransactionsTable({
   const [editingTransaction, setEditingTransaction] = React.useState<Transaction | null>(null)
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = React.useState(false)
   const [transactionToDelete, setTransactionToDelete] = React.useState<string | null>(null)
+  const [isBulkCategoryDialogOpen, setIsBulkCategoryDialogOpen] = React.useState(false)
 
   const getCategoryName = (categoryId: number) => {
     return categories.find(cat => cat.id === categoryId)?.name || 'Uncategorized'
@@ -203,8 +205,8 @@ export function TransactionsTable({
         const dateValue = type === 'recurring' 
           ? row.getValue("start_date") 
           : row.getValue("date")
-        if (!dateValue) return null
-        const date = new Date(dateValue)
+        if (!dateValue || dateValue === '') return null
+        const date = new Date(dateValue as string)
         return <div>{format(date, 'MM/dd/yyyy')}</div>
       },
     },
@@ -293,6 +295,10 @@ export function TransactionsTable({
     }
   }
 
+  function handleBulkCategoryChange(categoryId: number): void {
+    throw new Error("Function not implemented.")
+  }
+
   return (
     <div className={cn("w-full space-y-4", className)}>
       {showFilters && (
@@ -331,6 +337,7 @@ export function TransactionsTable({
               </DropdownMenuContent>
             </DropdownMenu>
             <DropdownMenu>
+            <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline">
                   Bulk Actions <ChevronDown className="ml-2 h-4 w-4" />
@@ -345,20 +352,11 @@ export function TransactionsTable({
                   Delete Selected
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuLabel>Change Category</DropdownMenuLabel>
-                {categories.map((category) => (
-                  <DropdownMenuItem
-                    key={category.id}
-                    onClick={() => {
-                      const selectedIds = Object.keys(rowSelection)
-                      onBulkEdit?.(selectedIds, { category_id: category.id })
-                      setRowSelection({})
-                    }}
-                  >
-                    {category.name}
-                  </DropdownMenuItem>
-                ))}
+                <DropdownMenuItem onClick={() => setIsBulkCategoryDialogOpen(true)}>
+                  Change Category
+                </DropdownMenuItem>
               </DropdownMenuContent>
+            </DropdownMenu>
             </DropdownMenu>
           </div>
         </div>
@@ -446,11 +444,10 @@ export function TransactionsTable({
         onSubmit={handleEditTransaction}
         initialData={editingTransaction ? {
           ...editingTransaction,
-          date: new Date(editingTransaction.date),
+          date: editingTransaction.date ? new Date(editingTransaction.date) : new Date(),
           category_id: editingTransaction.category_id.toString()
         } : undefined}
-        mode="edit"
-      />
+        mode="edit" transactionType={"recurring"}      />
 
       <ConfirmationDialog
         isOpen={isConfirmDialogOpen}
@@ -458,6 +455,13 @@ export function TransactionsTable({
         onConfirm={() => transactionToDelete && handleDeleteTransaction(transactionToDelete)}
         title="Delete Transaction"
         description="Are you sure you want to delete this transaction?"
+      />
+
+<BulkCategoryChangeDialog
+        isOpen={isBulkCategoryDialogOpen}
+        onClose={() => setIsBulkCategoryDialogOpen(false)}
+        onSave={handleBulkCategoryChange}
+        selectedCount={Object.keys(rowSelection).length}
       />
     </div>
   )

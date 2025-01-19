@@ -53,7 +53,7 @@ export function SpendingChart() {
       </CardHeader>
       <CardContent className="pt-4 h-[300px]">
         <ChartContainer config={chartConfig} className="w-full h-full">
-          <ResponsiveContainer width="100%" height="100%" minHeight={300}>
+          <ResponsiveContainer>
             <BarChart data={chartData}>
               <CartesianGrid vertical={false} strokeDasharray="3 3" />
               <XAxis
@@ -110,4 +110,3 @@ export function SpendingChart() {
     </Card>
   );
 }
-

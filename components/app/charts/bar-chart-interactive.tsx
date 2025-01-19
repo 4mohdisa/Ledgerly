@@ -32,6 +32,10 @@ interface TransactionChartProps {
   chartType?: 'bar' | 'line'
 }
 
+interface ChartTotals {
+  [key: string]: number;
+}
+
 const processChartData = (transactions: Transaction[], dateRange: { start: Date; end: Date }, metrics: { key: string; label: string; color: string }[]) => {
   const start = startOfDay(dateRange.start);
   const end = endOfDay(dateRange.end);
@@ -63,38 +67,78 @@ const processChartData = (transactions: Transaction[], dateRange: { start: Date;
   return Array.from(dateMap.values());
 };
 
-export function TransactionChart({ transactions, dateRange, metrics, chartType = 'bar' }: TransactionChartProps) {
-  const [activeChart, setActiveChart] = React.useState<string>(metrics[0].key)
+const DEFAULT_DATE_RANGE = {
+  start: new Date(),
+  end: new Date()
+};
 
-  const chartData = React.useMemo(() => processChartData(transactions, dateRange, metrics), [transactions, dateRange, metrics])
+const DEFAULT_METRICS = [
+  { key: "income", label: "Income", color: "hsl(var(--chart-1))" },
+  { key: "expense", label: "Expense", color: "hsl(var(--chart-2))" }
+];
+
+export function TransactionChart({ 
+  transactions = [], 
+  dateRange = DEFAULT_DATE_RANGE, 
+  metrics = DEFAULT_METRICS, 
+  chartType = 'bar' 
+}: TransactionChartProps) {
+  // Initialize activeChart with the first metric key if available, otherwise 'income'
+  const [activeChart, setActiveChart] = React.useState<string>(() => 
+    metrics && metrics.length > 0 ? metrics[0].key : 'income'
+  );
+
+  // Only update activeChart if metrics array changes completely
+  React.useEffect(() => {
+    if (metrics && metrics.length > 0 && !metrics.find(m => m.key === activeChart)) {
+      setActiveChart(metrics[0].key);
+    }
+  }, [metrics, activeChart]);
+
+  const chartData = React.useMemo(() => {
+    if (!transactions || !dateRange || !metrics) {
+      return [];
+    }
+    return processChartData(transactions, dateRange, metrics);
+  }, [transactions, dateRange, metrics]);
 
   const chartConfig: ChartConfig = React.useMemo(() => {
     const config: ChartConfig = {
       transactions: { label: "Transactions" },
     };
-    metrics.forEach(metric => {
-      config[metric.key] = {
-        label: metric.label,
-        color: metric.color,
-      };
-    });
+    if (metrics) {
+      metrics.forEach(metric => {
+        config[metric.key] = {
+          label: metric.label,
+          color: metric.color,
+        };
+      });
+    }
     return config;
   }, [metrics]);
 
-  const total = React.useMemo(
-    () => metrics.reduce((acc, metric) => ({
+  // Define type for totals
+  type ChartTotals = {
+    [key: string]: number;
+  };
+
+  // Memoize the total calculation instead of using state
+  const total = React.useMemo<ChartTotals>(() => {
+    if (!chartData || !metrics) {
+      return {};
+    }
+    return metrics.reduce((acc, metric) => ({
       ...acc,
       [metric.key]: chartData.reduce((sum, curr) => sum + (curr[metric.key] || 0), 0),
-    }), {}),
-    [chartData, metrics]
-  )
+    }), {} as ChartTotals);
+  }, [chartData, metrics]);
 
-  const renderChart = () => {
+  const renderChart = React.useCallback(() => {
     const ChartComponent = chartType === 'bar' ? BarChart : LineChart;
     const DataComponent = chartType === 'bar' ? Bar : Line;
 
     return (
-      <ResponsiveContainer width="100%" height={350}>
+      <ResponsiveContainer>
         <ChartComponent
           data={chartData}
           margin={{
@@ -132,7 +176,7 @@ export function TransactionChart({ transactions, dateRange, metrics, chartType =
         </ChartComponent>
       </ResponsiveContainer>
     );
-  };
+  }, [chartData, metrics, activeChart, chartType]);
 
   return (
     <Card className="col-span-3 w-full">
@@ -155,7 +199,7 @@ export function TransactionChart({ transactions, dateRange, metrics, chartType =
                 {metric.label}
               </span>
               <span className="text-lg font-bold leading-none sm:text-3xl">
-                ${(total[metric.key] as number).toLocaleString()}
+                ${(total[metric.key] || 0).toLocaleString()}
               </span>
             </button>
           ))}
@@ -172,4 +216,3 @@ export function TransactionChart({ transactions, dateRange, metrics, chartType =
     </Card>
   )
 }
-

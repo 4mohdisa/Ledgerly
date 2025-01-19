@@ -23,7 +23,7 @@ const COLORS = ["hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3
 // Process transactions data for the chart
 const processChartData = () => {
   const categoryTotals = recurringTransactions.reduce((acc, transaction) => {
-    const category = transaction.category;
+    const category = transaction.category_name;
     if (!acc[category]) {
       acc[category] = 0;
     }
@@ -72,7 +72,7 @@ export function PieDonutChart() {
             config={chartConfig}
             className="mx-auto aspect-square w-full max-h-[250px]"
           >
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer >
               <PieChart>
                 <ChartTooltip
                   cursor={false}

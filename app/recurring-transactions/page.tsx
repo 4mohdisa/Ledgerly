@@ -83,7 +83,7 @@ export default function RecurringTransactionsPage() {
           <div className="mb-8">
             <h2 className="text-xl font-semibold mb-4">Transaction Analytics</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Card>
+              <Card className="border-none shadow-none bg-transparent">
                 <CardHeader>
                   <CardTitle>Recurring by Category</CardTitle>
                   <CardDescription>Distribution of recurring transactions</CardDescription>
@@ -92,14 +92,14 @@ export default function RecurringTransactionsPage() {
                   <PieDonutChart />
                 </CardContent>
               </Card>
-              <Card>
+              <Card className="border-none shadow-none bg-transparent">
                 <CardHeader>
                   <CardTitle>Upcoming Transactions</CardTitle>
                   <CardDescription>Next 30 days transaction forecast</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <TransactionChart 
-                    transactions={upcomingTransactions}
+                    transactions={upcomingTransactions || []}
                     dateRange={{ 
                       start: dateRange?.from || startOfMonth(new Date()),
                       end: dateRange?.to || endOfMonth(new Date())
@@ -141,7 +141,11 @@ export default function RecurringTransactionsPage() {
 
             <CardContent className="p-0">
               <TransactionsTable
-                data={upcomingTransactions}
+                data={upcomingTransactions.map(transaction => ({
+                  ...transaction,
+                  name: `${transaction.category_name} Payment`,
+                  account_type: 'Checking' // Default to Checking, adjust as needed
+                }))}
                 showFilters={true}
                 showPagination={true}
                 showRowsCount={true}
