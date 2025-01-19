@@ -26,50 +26,26 @@ interface Transaction {
 }
 
 interface TransactionChartProps {
-  transactions: Transaction[]
-  dateRange: { start: Date; end: Date }
-  metrics: { key: string; label: string; color: string }[]
-  chartType?: 'bar' | 'line'
+  transactions?: Transaction[];
+  metrics?: { key: string; label: string; color: string }[];
+  chartType?: 'bar' | 'line';
 }
 
-interface ChartTotals {
-  [key: string]: number;
-}
-
-const processChartData = (transactions: Transaction[], dateRange: { start: Date; end: Date }, metrics: { key: string; label: string; color: string }[]) => {
-  const start = startOfDay(dateRange.start);
-  const end = endOfDay(dateRange.end);
-  const days = eachDayOfInterval({ start, end });
-
-  const initialData = days.map(day => {
-    const date = format(day, 'yyyy-MM-dd');
-    const dataPoint: { [key: string]: any } = { date };
+const processChartData = (transactions: Transaction[], metrics: { key: string; label: string; color: string }[]) => {
+  const data = transactions.map(transaction => {
+    const dataPoint: { [key: string]: any } = { date: transaction.date };
     metrics.forEach(metric => {
       dataPoint[metric.key] = 0;
+    });
+    metrics.forEach(metric => {
+      if (transaction.type.toLowerCase() === metric.key.toLowerCase()) {
+        dataPoint[metric.key] += transaction.amount;
+      }
     });
     return dataPoint;
   });
 
-  const dateMap = new Map(initialData.map(item => [item.date, item]));
-
-  transactions.forEach(transaction => {
-    const date = format(new Date(transaction.date), 'yyyy-MM-dd');
-    if (dateMap.has(date)) {
-      const entry = dateMap.get(date)!;
-      metrics.forEach(metric => {
-        if (transaction.type.toLowerCase() === metric.key.toLowerCase()) {
-          entry[metric.key] += transaction.amount;
-        }
-      });
-    }
-  });
-
-  return Array.from(dateMap.values());
-};
-
-const DEFAULT_DATE_RANGE = {
-  start: new Date(),
-  end: new Date()
+  return data;
 };
 
 const DEFAULT_METRICS = [
@@ -79,7 +55,6 @@ const DEFAULT_METRICS = [
 
 export function TransactionChart({ 
   transactions = [], 
-  dateRange = DEFAULT_DATE_RANGE, 
   metrics = DEFAULT_METRICS, 
   chartType = 'bar' 
 }: TransactionChartProps) {
@@ -96,11 +71,11 @@ export function TransactionChart({
   }, [metrics, activeChart]);
 
   const chartData = React.useMemo(() => {
-    if (!transactions || !dateRange || !metrics) {
+    if (!transactions || !metrics) {
       return [];
     }
-    return processChartData(transactions, dateRange, metrics);
-  }, [transactions, dateRange, metrics]);
+    return processChartData(transactions, metrics);
+  }, [transactions, metrics]);
 
   const chartConfig: ChartConfig = React.useMemo(() => {
     const config: ChartConfig = {

@@ -9,7 +9,6 @@ import { PieDonutChart } from "@/components/app/charts/pie-donut-chart"
 import { TransactionsTable } from "@/components/app/tables/transactions-table"
 import { AppSidebar } from "@/components/app/app-sidebar"
 import { TransactionChart } from "@/components/app/charts/bar-chart-interactive"
-import { SpendingRadarChart } from "@/components/app/charts/radar-chart"
 import { NetBalanceChart } from "@/components/app/charts/line-chart"
 import { DateRangePickerWithRange } from "@/components/app/date-range-picker"
 import { DateRange } from "react-day-picker"
@@ -144,19 +143,19 @@ export default function Dashboard() {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-3">
-                  <TransactionChart dateRange={dateRangeValue} />
+                  <TransactionChart />
               </div>
 
               <div className="lg:col-span-1">
-                  <NetBalanceChart dateRange={dateRangeValue} />
+                  <NetBalanceChart/>
               </div>
 
               <div>
-                  <SpendingChart dateRange={dateRangeValue} />
+                  <SpendingChart />
               </div>
 
               <div>
-                  <PieDonutChart dateRange={dateRangeValue} />
+                  <PieDonutChart />
               </div>
             </div>
 

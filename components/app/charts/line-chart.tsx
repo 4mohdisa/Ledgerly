@@ -40,8 +40,6 @@ const processTransactions = (): DailyBalance[] => {
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
 }
 
-const chartData = processTransactions()
-
 const chartConfig = {
   balance: {
     label: "Net Balance",
@@ -49,12 +47,14 @@ const chartConfig = {
   },
 } satisfies ChartConfig
 
-const formatCurrency = (value: number) => 
-  new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value)
+const formatCurrency = (value: number) => {
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
+}
 
 export function NetBalanceChart() {
-  const minBalance = Math.min(...chartData.map(d => d.balance))
-  const maxBalance = Math.max(...chartData.map(d => d.balance))
+  const chartData = processTransactions();
+  const minBalance = Math.min(...chartData.map(d => d.balance));
+  const maxBalance = Math.max(...chartData.map(d => d.balance));
 
   return (
     <Card className="col-span-3 w-full">
@@ -97,7 +97,7 @@ export function NetBalanceChart() {
                 tickLine={false}
                 axisLine={false}
                 tickMargin={8}
-                tickFormatter={(value) => formatCurrency(value)}
+                tickFormatter={(value: number) => formatCurrency(value)}
               />
               <ChartTooltip
                 content={
@@ -111,7 +111,7 @@ export function NetBalanceChart() {
                         year: "numeric",
                       })
                     }}
-                    formatter={(value) => formatCurrency(value)}
+                    formatter={(value: any) => formatCurrency(value as number)}
                   />
                 }
               />
@@ -120,15 +120,20 @@ export function NetBalanceChart() {
                 dataKey="balance"
                 stroke="hsl(var(--chart-1))"
                 strokeWidth={2}
-                dot={{
-                  r: 4,
-                  fill: "hsl(var(--chart-1))",
-                  stroke: "hsl(var(--chart-1))",
-                  strokeWidth: 2,
-                }}
-                dotProps={{
-                  fill: (props: { payload: DailyBalance }) => 
-                    props.payload.balance >= 0 ? "hsl(var(--success))" : "hsl(var(--destructive))"
+                dot={(props: any) => {
+                  const fillColor = props.payload.balance >= 0 
+                    ? "hsl(var(--success))" 
+                    : "hsl(var(--destructive))";
+                  return (
+                    <circle
+                      cx={props.cx}
+                      cy={props.cy}
+                      r={4}
+                      fill={fillColor}
+                      stroke={fillColor}
+                      strokeWidth={2}
+                    />
+                  );
                 }}
               />
             </LineChart>

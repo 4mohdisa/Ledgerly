@@ -40,11 +40,6 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 export function SpendingChart() {
-  const latestMonth = chartData[chartData.length - 1];
-  const previousMonth = chartData[chartData.length - 2];
-  const incomeChange = ((latestMonth.income - previousMonth.income) / previousMonth.income) * 100;
-  const expensesChange = ((latestMonth.expenses - previousMonth.expenses) / previousMonth.expenses) * 100;
-
   return (
     <Card className="w-full h-full">
       <CardHeader>
@@ -79,32 +74,8 @@ export function SpendingChart() {
         </ChartContainer>
       </CardContent>
       <CardFooter className="flex-col items-start gap-2 text-sm">
-        <div className="flex justify-between w-full">
-          <div className="flex items-center gap-2 font-medium">
-            Income: {incomeChange >= 0 ? (
-              <span className="text-green-600 flex items-center">
-                +{incomeChange.toFixed(1)}% <TrendingUp className="h-4 w-4 ml-1" />
-              </span>
-            ) : (
-              <span className="text-red-600 flex items-center">
-                {incomeChange.toFixed(1)}% <TrendingDown className="h-4 w-4 ml-1" />
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-2 font-medium">
-            Expenses: {expensesChange >= 0 ? (
-              <span className="text-red-600 flex items-center">
-                +{expensesChange.toFixed(1)}% <TrendingUp className="h-4 w-4 ml-1" />
-              </span>
-            ) : (
-              <span className="text-green-600 flex items-center">
-                {expensesChange.toFixed(1)}% <TrendingDown className="h-4 w-4 ml-1" />
-              </span>
-            )}
-          </div>
-        </div>
         <div className="text-muted-foreground">
-          Comparing {chartData[chartData.length - 1].month} to {chartData[chartData.length - 2].month}
+          Comparing latest month to previous month
         </div>
       </CardFooter>
     </Card>
