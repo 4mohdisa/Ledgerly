@@ -100,10 +100,6 @@ export default function RecurringTransactionsPage() {
                 <CardContent>
                   <TransactionChart 
                     transactions={upcomingTransactions || []}
-                    dateRange={{ 
-                      start: dateRange?.from || startOfMonth(new Date()),
-                      end: dateRange?.to || endOfMonth(new Date())
-                    }}
                     metrics={[
                       { key: "income", label: "Income", color: "hsl(var(--chart-1))" },
                       { key: "expense", label: "Expense", color: "hsl(var(--chart-2))" }
