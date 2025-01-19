@@ -69,20 +69,8 @@ const recurringTransactionSchema = z.object({
   ...baseSchema,
   frequency: z.enum(frequencies as [string, ...string[]]),
   start_date: z.date(),
-  end_date: z.date()
-    .optional()
-    .superRefine((endDate, ctx) => {
-      const startDate = (ctx.parent as { start_date?: Date }).start_date;
-      if (endDate && startDate) {
-        if (endDate <= startDate) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: "End date must be after start date"
-          });
-        }
-      }
-    }),
-})
+  end_date: z.date().optional(),
+});
 
 type TransactionFormValues = z.infer<typeof transactionSchema>
 type RecurringTransactionFormValues = z.infer<typeof recurringTransactionSchema>
@@ -171,7 +159,7 @@ export function TransactionDialog({
                     <div className="mt-2 text-sm text-destructive">
                       <ul className="list-disc space-y-1 pl-5">
                         {Object.entries(form.formState.errors).map(([key, value]) => (
-                          <li key={key}>{value.message}</li>
+                          <li key={key}>{value?.message?.toString() || 'Invalid field'}</li>
                         ))}
                       </ul>
                     </div>
@@ -386,7 +374,7 @@ export function TransactionDialog({
                           selected={field.value}
                           onSelect={field.onChange}
                           disabled={(date) =>
-                            date < new Date() || date < form.getValues(isRecurring ? 'start_date' : 'date')
+                            date < new Date()
                           }
                           initialFocus
                         />
