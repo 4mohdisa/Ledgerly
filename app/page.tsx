@@ -160,17 +160,7 @@ export default function Dashboard() {
             </div>
 
             <TransactionsTable 
-              dateRange={dateRange} 
-              showFilters={false}
-              showPagination={false}
-              showRowsCount={false}
-              maxTransactions={7}
-              data={transactions}
-              onBulkEdit={handleBulkEdit}
-              sortBy={{
-                field: "date",
-                order: "desc"
-              }}
+data={transactions}
             />
           </div>
         </div>
