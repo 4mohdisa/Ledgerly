@@ -1,19 +1,20 @@
 "use client";
 
-import localFont from "next/font/local";
 import { ClerkProvider } from '@clerk/nextjs';
 import { SidebarProvider, SidebarTrigger } from '../components/ui/sidebar';
 import "./globals.css";
+import { UserSyncProvider } from '@/components/providers/user-sync-provider'
+import localFont from "next/font/local";
+import { SupabaseAuthSync } from '@/components/auth/supabase-sync';
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
   variable: "--font-geist-sans",
-  weight: "100 900",
 });
+
 const geistMono = localFont({
   src: "./fonts/GeistMonoVF.woff",
   variable: "--font-geist-mono",
-  weight: "100 900",
 });
 
 export default function RootLayout({
@@ -22,26 +23,30 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-        suppressHydrationWarning
-      >
-        <ClerkProvider 
-          appearance={{
-            elements: {
-              footer: "hidden",
-              card: "shadow-none",
-            }
-          }}
-          publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
+    <ClerkProvider 
+      appearance={{
+        elements: {
+          footer: "hidden",
+          card: "shadow-none",
+        }
+      }}
+      publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
+      __experimental_crossOriginAuth
+    >
+      <html lang="en" suppressHydrationWarning>
+        <body
+          className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+          suppressHydrationWarning
         >
-          <SidebarProvider>
-            <SidebarTrigger />
-            {children}
-          </SidebarProvider>
-        </ClerkProvider>
-      </body>
-    </html>
+          <SupabaseAuthSync />
+          <UserSyncProvider>
+            <SidebarProvider>
+              <SidebarTrigger />
+              {children}
+            </SidebarProvider>
+          </UserSyncProvider>
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }

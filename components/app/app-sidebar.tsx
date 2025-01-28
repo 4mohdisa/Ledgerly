@@ -9,10 +9,6 @@ import {
   SidebarGroup, 
   SidebarMenu, 
   SidebarMenuItem, 
-  SidebarMenuButton,
-  SidebarMenuSub,
-  SidebarMenuSubItem,
-  SidebarMenuSubButton
 } from "@/components/ui/sidebar";
 import { Home, List, Repeat, ChevronsUpDown, Settings, LogOut } from 'lucide-react';
 import { useUser, SignedIn, SignOutButton, useClerk } from "@clerk/nextjs";
