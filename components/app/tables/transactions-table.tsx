@@ -42,7 +42,7 @@ import { format } from "date-fns"
 import { transactions } from "@/data/transactions"
 import { categories } from "@/data/categories"
 import { ConfirmationDialog } from "../confirmation-dialog"
-import { TransactionDialog } from "../transaction-dialog"
+import { TransactionDialog } from "../transaction-dialogs/transactions/transaction-dialog"
 import { DateRange } from "react-day-picker"
 import { BulkCategoryChangeDialog } from "../bulk-category-change"
 
@@ -447,7 +447,7 @@ export function TransactionsTable({
           date: editingTransaction.date ? new Date(editingTransaction.date) : new Date(),
           category_id: editingTransaction.category_id.toString()
         } : undefined}
-        mode="edit" transactionType={"recurring"}      />
+        mode="edit"      />
 
       <ConfirmationDialog
         isOpen={isConfirmDialogOpen}

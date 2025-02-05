@@ -1,9 +1,12 @@
 "use client"
 
-import React from 'react'
+import React, { useState } from 'react'
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
-import { z } from "zod"
+import { format } from "date-fns"
+import { CalendarIcon } from 'lucide-react'
+import { useUser } from "@clerk/nextjs"
+import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -33,57 +36,17 @@ import {
 } from "@/components/ui/select"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { CalendarIcon } from 'lucide-react'
-import { format } from "date-fns"
-import { toast } from "sonner"
 
 import { transactionTypes } from "@/data/transactiontypes"
 import { frequencies } from "@/data/frequencies"
 import { categories } from "@/data/categories"
 import { accountTypes } from "@/data/account-types"
+import { transactionService } from '@/app/services/transaction-services'
+import { Transaction } from '@/app/types/transaction'
+import { BaseDialogProps, TransactionFormValues, transactionSchema } from '../shared/schema'
 
-const baseSchema = {
-  name: z.string().min(2, { message: "Name must be at least 2 characters." }),
-  amount: z
-    .number()
-    .positive({ message: "Amount must be a positive number." })
-    .max(100000000, { message: "Amount exceeds maximum limit of $100,000,000." }),
-  type: z.enum(transactionTypes as [string, ...string[]]),
-  account_type: z.enum(accountTypes as [string, ...string[]]),
-  category_id: z.string(),
-  description: z.string().optional(),
-  created_at: z.string().datetime({ offset: true }).optional(),
-  updated_at: z.string().datetime({ offset: true }).optional(),
-}
-
-const transactionSchema = z.object({
-  ...baseSchema,
-  date: z.date().refine(
-    (date) => date <= new Date(),
-    { message: "Transaction date cannot be in the future." }
-  ),
-  recurring_frequency: z.enum(frequencies as [string, ...string[]]).optional(),
-})
-
-const recurringTransactionSchema = z.object({
-  ...baseSchema,
-  frequency: z.enum(frequencies as [string, ...string[]]),
-  start_date: z.date(),
-  end_date: z.date().optional(),
-});
-
-type TransactionFormValues = z.infer<typeof transactionSchema>
-type RecurringTransactionFormValues = z.infer<typeof recurringTransactionSchema>
-
-type FormValues = TransactionFormValues | RecurringTransactionFormValues
-
-interface TransactionDialogProps {
-  isOpen: boolean
-  onClose: () => void
-  onSubmit: (data: FormValues) => void
-  initialData?: Partial<FormValues>
-  mode: 'create' | 'edit'
-  transactionType: 'regular' | 'recurring'
+interface TransactionDialogProps extends BaseDialogProps {
+  onSubmit?: (data: TransactionFormValues) => void
 }
 
 export function TransactionDialog({
@@ -92,13 +55,12 @@ export function TransactionDialog({
   onSubmit,
   initialData,
   mode,
-  transactionType
 }: TransactionDialogProps) {
-  const isRecurring = transactionType === 'recurring'
-  const schema = isRecurring ? recurringTransactionSchema : transactionSchema
+  const { user } = useUser()
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const form = useForm<FormValues>({
-    resolver: zodResolver(schema),
+  const form = useForm<TransactionFormValues>({
+    resolver: zodResolver(transactionSchema),
     defaultValues: {
       name: "",
       description: "",
@@ -106,31 +68,47 @@ export function TransactionDialog({
       type: "expense",
       account_type: "cash",
       category_id: "",
-      ...(isRecurring
-        ? { frequency: "monthly", start_date: new Date() }
-        : { date: new Date(), recurring_frequency: "never" }),
+      date: new Date(),
+      recurring_frequency: "never",
       ...initialData,
     },
   })
 
-  const handleSubmit = async (data: FormValues) => {
+  const handleSubmit = async (data: TransactionFormValues) => {
+    if (!user?.id) {
+      toast.error("Authentication required", {
+        description: "Please sign in to create transactions.",
+      })
+      return
+    }
+
+    setIsSubmitting(true)
+
     try {
       const submissionData = {
         ...data,
+        category_id: Number(data.category_id),
         created_at: mode === 'create' ? new Date().toISOString() : undefined,
         updated_at: new Date().toISOString(),
-      };
-      
-      await onSubmit(submissionData);
-      toast.success(`${mode === 'create' ? 'Created' : 'Updated'} ${isRecurring ? 'recurring ' : ''}transaction`, {
-        description: "Your transaction has been successfully saved."
-      });
-      onClose();
+      }
+
+      await transactionService.createTransaction(submissionData as Transaction, user.id)
+
+      toast.success(`${mode === 'create' ? 'Created' : 'Updated'} transaction`, {
+        description: "Your transaction has been successfully saved.",
+      })
+
+      if (onSubmit) {
+        onSubmit(data)
+      }
+      onClose()
     } catch (error) {
-      console.error('Failed to submit transaction:', error);
+      console.error('Failed to submit transaction:', error)
       toast.error("Failed to save transaction", {
-        description: "Please try again."
-      });
+        description: error instanceof Error ? error.message : "Please try again.",
+      })
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -139,16 +117,17 @@ export function TransactionDialog({
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
           <DialogTitle>
-            {mode === 'create' ? `Create ${isRecurring ? 'Recurring ' : ''}Transaction` : `Edit ${isRecurring ? 'Recurring ' : ''}Transaction`}
+            {mode === 'create' ? 'Create Transaction' : 'Edit Transaction'}
           </DialogTitle>
           <DialogDescription>
             {mode === 'create' 
-              ? `Add a new ${isRecurring ? 'recurring ' : ''}transaction to your records.` 
-              : `Make changes to your ${isRecurring ? 'recurring ' : ''}transaction here.`}
+              ? 'Add a new transaction to your records.'
+              : 'Make changes to your transaction here.'}
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+            {/* Error Summary */}
             {Object.keys(form.formState.errors).length > 0 && (
               <div className="rounded-md bg-destructive/15 p-4">
                 <div className="flex">
@@ -167,6 +146,8 @@ export function TransactionDialog({
                 </div>
               </div>
             )}
+
+            {/* Name and Amount */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
@@ -202,13 +183,14 @@ export function TransactionDialog({
               />
             </div>
 
+            {/* Date, Type, and Account Type */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <FormField
                 control={form.control}
-                name={isRecurring ? "start_date" : "date"}
+                name="date"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{isRecurring ? "Start Date" : "Date"}</FormLabel>
+                    <FormLabel>Date</FormLabel>
                     <Popover>
                       <PopoverTrigger asChild>
                         <FormControl>
@@ -293,6 +275,7 @@ export function TransactionDialog({
               />
             </div>
 
+            {/* Category and Recurring Frequency */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
@@ -321,10 +304,10 @@ export function TransactionDialog({
 
               <FormField
                 control={form.control}
-                name={isRecurring ? "frequency" : "recurring_frequency"}
+                name="recurring_frequency"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{isRecurring ? "Frequency" : "Recurring Frequency"}</FormLabel>
+                    <FormLabel>Recurring Frequency</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger>
@@ -345,47 +328,7 @@ export function TransactionDialog({
               />
             </div>
 
-            {isRecurring && (
-              <FormField
-                control={form.control}
-                name="end_date"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>End Date (Optional)</FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant="outline"
-                            className="w-full h-10 px-3 text-left font-normal flex justify-between items-center"
-                          >
-                            {field.value ? (
-                              format(field.value, "PPP")
-                            ) : (
-                              <span className="text-muted-foreground">Pick an end date</span>
-                            )}
-                            <CalendarIcon className="h-4 w-4 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={field.value}
-                          onSelect={field.onChange}
-                          disabled={(date) =>
-                            date < new Date()
-                          }
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
-
+            {/* Description */}
             <div className="col-span-full">
               <FormField
                 control={form.control}
@@ -406,12 +349,39 @@ export function TransactionDialog({
               />
             </div>
 
+            {/* Footer */}
             <DialogFooter>
               <Button type="button" variant="outline" onClick={onClose}>
                 Cancel
               </Button>
-              <Button type="submit">
-                {mode === 'create' ? `Create ${isRecurring ? 'Recurring ' : ''}Transaction` : 'Save Changes'}
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? (
+                  <>
+                    <svg
+                      className="animate-spin -ml-1 mr-3 h-4 w-4 text-white"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      />
+                    </svg>
+                    Processing...
+                  </>
+                ) : (
+                  mode === 'create' ? 'Create Transaction' : 'Save Changes'
+                )}
               </Button>
             </DialogFooter>
           </form>

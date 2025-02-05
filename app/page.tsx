@@ -10,12 +10,12 @@ import { TransactionsTable } from "@/components/app/tables/transactions-table"
 import { AppSidebar } from "@/components/app/app-sidebar"
 import { TransactionChart } from "@/components/app/charts/bar-chart-interactive"
 import { NetBalanceChart } from "@/components/app/charts/line-chart"
-import { DateRangePickerWithRange } from "@/components/app/date-range-picker"
 import { DateRange } from "react-day-picker"
 import { startOfMonth, endOfMonth, format, isFirstDayOfMonth } from "date-fns"
 import { BalanceDialog } from "@/components/app/balance-dialog"
-import { TransactionDialog } from "@/components/app/transaction-dialog"
+import { TransactionDialog } from "@/components/app/transaction-dialogs/transactions/transaction-dialog"
 import { UploadDialog } from "@/components/app/upload-dialog"
+import { transactionService } from '@/app/services/transaction-services';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,7 +33,7 @@ const defaultDateRange = {
 
 export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true)
-  const [isAddTransactionOpen, setIsAddTransactionOpen] = useState(false)
+  const [isAddTransactionOpen, setIsAddTransactionOpen] = useState(false);
   const [isUploadFileOpen, setIsUploadFileOpen] = useState(false)
   const [isBalanceDialogOpen, setIsBalanceDialogOpen] = useState(false)
   const [isEditingBalance, setIsEditingBalance] = useState(false)
@@ -73,13 +73,21 @@ export default function Dashboard() {
 
   const isAddBalanceVisible = isFirstDayOfMonth(new Date()) // This is a simplified check. You might want to implement more sophisticated logic.
 
-  const handleTransactionSubmit = useCallback((data: any) => {
-    console.log('Transaction submitted:', data)
-    // Here you would typically save the transaction to your backend
-  }, [])
+  const handleTransactionSubmit = async (data: any) => {
+    try {
+      if (data.transactionType === "regular") {
+        await transactionService.createTransaction(data, "user_id_here");
+      } else {
+        await transactionService.createRecurringTransaction(data, "user_id_here");
+      }
+      console.log("Transaction created successfully:", data);
+    } catch (error) {
+      console.error("Failed to create transaction:", error);
+    }
+  };
 
   const handleBulkEdit = useCallback((ids: string[], changes: Partial<any>) => {
-    setTransactionsList(prev => prev.map((transaction: { id: string }) => 
+    setTransactionsList(prev => prev.map((transaction: { id: string }) =>
       ids.includes(transaction.id) ? { ...transaction, ...changes } : transaction
     ))
   }, [])
@@ -96,7 +104,7 @@ export default function Dashboard() {
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
             <h1 className="text-3xl font-bold">Dashboard</h1>
             <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4 w-full md:w-auto">
-            <MonthPicker
+              <MonthPicker
                 date={selectedDate}
                 onDateChange={handleDateChange}
               />
@@ -109,7 +117,7 @@ export default function Dashboard() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onSelect={handleAddTransaction}>
+                      <DropdownMenuItem onSelect={() => setIsAddTransactionOpen(true)}>
                         Add Transaction
                       </DropdownMenuItem>
                       <DropdownMenuItem onSelect={handleUploadFile}>
@@ -124,14 +132,16 @@ export default function Dashboard() {
                   </DropdownMenu>
                 </div>
                 <div className="hidden md:flex gap-4">
-                  <Button onClick={handleAddTransaction}>Add Transaction</Button>
+                  <Button onClick={() => setIsAddTransactionOpen(true)}>
+                    Add Transaction
+                  </Button>
                   <Button onClick={handleUploadFile} variant="outline">
                     <Upload className="mr-2 h-4 w-4" /> Upload File
                   </Button>
                   {/* {isAddBalanceVisible && ( */}
-                    <Button onClick={handleAddBalance} variant="secondary">
-                      <Plus className="mr-2 h-4 w-4" /> Add Balance
-                    </Button>
+                  <Button onClick={handleAddBalance} variant="secondary">
+                    <Plus className="mr-2 h-4 w-4" /> Add Balance
+                  </Button>
                   {/* )} */}
                 </div>
               </div>
@@ -143,24 +153,24 @@ export default function Dashboard() {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-3">
-                  <TransactionChart />
+                <TransactionChart />
               </div>
 
               <div className="lg:col-span-1">
-                  <NetBalanceChart/>
+                <NetBalanceChart />
               </div>
 
               <div>
-                  <SpendingChart />
+                <SpendingChart />
               </div>
 
               <div>
-                  <PieDonutChart />
+                <PieDonutChart />
               </div>
             </div>
 
-            <TransactionsTable 
-data={transactions}
+            <TransactionsTable
+              data={transactions}
             />
           </div>
         </div>
@@ -174,9 +184,10 @@ data={transactions}
       <TransactionDialog
         isOpen={isAddTransactionOpen}
         onClose={() => setIsAddTransactionOpen(false)}
-        onSubmit={() => { } }
-        mode="create" transactionType={'recurring'}      />
-      <UploadDialog 
+        onSubmit={handleTransactionSubmit}
+        mode="create"
+      />
+      <UploadDialog
         open={isUploadFileOpen}
         onOpenChange={setIsUploadFileOpen}
       />

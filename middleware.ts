@@ -1,3 +1,4 @@
+import { getAuth } from "@clerk/nextjs/server";
 import { clerkClient, clerkMiddleware } from "@clerk/nextjs/server";
 import { createClient } from "@/utils/supabase/middleware";
 import { NextResponse } from "next/server";
@@ -20,15 +21,14 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
 
   // Check if the current route is protected
   const isProtectedRoute = protectedRoutes.includes(pathname);
-
   if (isProtectedRoute) {
     // Handle non-authenticated users for protected routes
     if (!userId) {
       return (await auth()).redirectToSignIn({ returnBackUrl: req.url });
     }
 
-    // Handle authenticated users
     try {
+      // Get the JWT token from Clerk
       const token = await (await auth()).getToken({ template: 'supabase' });
       if (!token) {
         console.error('No auth token available');
@@ -43,16 +43,15 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
       });
 
       // Get Clerk user details
-      const clerk = clerkClient();
-      const clerkUser = await (await clerk).users.getUser(userId);
-      
+      const clerk = await clerkClient();
+      const clerkUser = await clerk.users.getUser(userId);
       if (!clerkUser.emailAddresses[0]?.emailAddress) {
         console.error('No email address found for user');
         errorUrl.searchParams.set('code', 'no_email');
         return NextResponse.redirect(errorUrl);
       }
 
-      // Attempt to upsert profile
+      // Upsert user profile in Supabase
       const { error: upsertError } = await supabase
         .from('profiles')
         .upsert({
@@ -66,12 +65,10 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
 
       if (upsertError) {
         console.error('Profile sync failed:', upsertError);
-        // Don't redirect on profile sync failure, just log it
         console.warn('Continuing despite profile sync failure');
       }
     } catch (error: unknown) {
       console.error('Auth process failed:', error);
-      // Only redirect on critical auth errors
       if (error instanceof Error && error.message.includes('No auth token')) {
         errorUrl.searchParams.set('code', 'auth_process');
         return NextResponse.redirect(errorUrl);

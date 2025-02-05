@@ -6,7 +6,7 @@ import { Plus, Menu } from 'lucide-react'
 import { TransactionsTable } from "@/components/app/tables/transactions-table"
 import { AppSidebar } from '@/components/app/app-sidebar'
 import { DateRangePickerWithRange } from '@/components/app/date-range-picker'
-import { TransactionDialog } from '@/components/app/transaction-dialog'
+import { TransactionDialog } from '@/components/app/transaction-dialogs/transactions/transaction-dialog'
 import { DateRange } from "react-day-picker"
 import { startOfMonth, endOfMonth, format } from "date-fns"
 import {
@@ -124,7 +124,6 @@ export default function TransactionsPage() {
         onClose={() => setIsAddTransactionOpen(false)}
         onSubmit={handleTransactionSubmit}
         mode="create"
-        transactionType="regular"
       />
     </div>
   )

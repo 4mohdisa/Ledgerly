@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Plus, Menu } from 'lucide-react'
 import { AppSidebar } from '@/components/app/app-sidebar'
 import { DateRangePickerWithRange } from '@/components/app/date-range-picker'
-import { TransactionDialog } from '@/components/app/transaction-dialog'
+import { RecurringTransactionDialog } from '@/components/app/transaction-dialogs/recurring-transactions/recurring-transaction-dialog'
 import { TransactionsTable } from '@/components/app/tables/transactions-table'
 import { DateRange } from "react-day-picker"
 import { startOfMonth, endOfMonth } from "date-fns"
@@ -159,12 +159,11 @@ export default function RecurringTransactionsPage() {
         </div>
       </div>
 
-      <TransactionDialog
+      <RecurringTransactionDialog
         isOpen={isAddTransactionOpen}
         onClose={() => setIsAddTransactionOpen(false)}
         onSubmit={handleTransactionSubmit}
         mode="create"
-        transactionType="recurring"
       />
     </div>
   )
