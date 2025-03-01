@@ -5,7 +5,7 @@ import { SidebarProvider, SidebarTrigger } from '../components/ui/sidebar';
 import "./globals.css";
 import { UserSyncProvider } from '@/components/providers/user-sync-provider'
 import localFont from "next/font/local";
-import { SupabaseAuthSync } from '@/components/auth/supabase-sync';
+import { SupabaseAuthSync } from '@/components/SupabaseAuthSync';
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -40,10 +40,7 @@ export default function RootLayout({
         >
           <SupabaseAuthSync />
           <UserSyncProvider>
-            <SidebarProvider>
-              <SidebarTrigger />
-              {children}
-            </SidebarProvider>
+            {children}
           </UserSyncProvider>
         </body>
       </html>

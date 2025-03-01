@@ -11,19 +11,22 @@ export const transactionService = {
     if (!userId) {
       throw new Error('User ID is required to create a transaction');
     }
-
+  
     const supabase = createClient();
-
     console.log('Verifying Supabase session');
+  
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
     if (sessionError) {
       console.error('Session error:', sessionError);
       throw new Error('Session verification failed');
     }
+  
     if (!session) {
       console.error('No active session found');
       throw new Error('No active session found');
     }
+  
+    console.log('Active session found:', session);
 
     try {
       console.log('Creating transaction:', { ...data, user_id: userId });
