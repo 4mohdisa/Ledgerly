@@ -1,7 +1,38 @@
 "use client"
-import { useEffect } from 'react'
-import { useUser } from '@clerk/nextjs'
+
+import { useEffect, useState } from 'react'
 import { createClient } from '@/utils/supabase/client'
+import { User } from '@supabase/supabase-js'
+import { Database } from '@/database.types'
+
+function useUser() {
+  const [user, setUser] = useState<User | null>(null)
+  const supabase = createClient()
+
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { session }, error } = await supabase.auth.getSession()
+      if (error) {
+        console.error('Error fetching user:', error)
+        return
+      }
+      setUser(session?.user ?? null)
+    }
+
+    getUser()
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null)
+    })
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [supabase.auth])
+
+  return { user }
+}
+
 export function UserSyncProvider({
   children,
 }: {
@@ -9,48 +40,29 @@ export function UserSyncProvider({
 }) {
   const { user } = useUser()
   const supabase = createClient()
+
   useEffect(() => {
-    if (!user?.id) return;
-    const syncWithRetry = async (attempt = 1) => {
-      try {
-        // Check if session exists first
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (!session) {
-          console.log('No active session, waiting for auth sync...');
-          if (attempt < 3) {
-            setTimeout(() => syncWithRetry(attempt + 1), 1000 * attempt);
-          }
-          return;
-        }
-        const { error } = await supabase
-          .from('profiles')
-          .upsert({
-            id: user.id,
-            email: user.primaryEmailAddress?.emailAddress,
-            name: user.fullName,
-            updated_at: new Date().toISOString(),
-          }, {
-            onConflict: 'id'
-          });
-        if (error) {
-          console.error('Profile sync error:', error);
-          if (attempt < 3) {
-            setTimeout(() => syncWithRetry(attempt + 1), 1000 * attempt);
-          }
-        } else {
-          console.log('Profile synced successfully');
-        }
-      } catch (error) {
-        console.error('Sync error:', error);
-        if (attempt < 3) {
-          setTimeout(() => syncWithRetry(attempt + 1), 1000 * attempt);
-        }
+    if (!user?.id || !user?.email) return
+
+    const profile: Database['public']['Tables']['profiles']['Insert'] = {
+      id: user.id,
+      email: user.email,
+      name: user.user_metadata?.full_name || 'Anonymous',
+      updated_at: new Date().toISOString(),
+    }
+
+    const timeout = setTimeout(async () => {
+      const { error: upsertError } = await supabase
+        .from('profiles')
+        .upsert(profile, { onConflict: 'id' })
+
+      if (upsertError) {
+        console.error('Error upserting profile:', upsertError)
       }
-    };
-    // Delay initial sync to allow auth setup
-    const timeout = setTimeout(() => syncWithRetry(), 2000);
-    return () => clearTimeout(timeout);
-  }, [user?.id]);
-  return children;
+    }, 0)
+
+    return () => clearTimeout(timeout)
+  }, [user?.id, user?.email, supabase])
+
+  return children
 }

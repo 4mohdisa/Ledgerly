@@ -3,7 +3,7 @@
 import React, { useState, useCallback } from 'react'
 import { Button } from "@/components/ui/button"
 import { Plus, Menu } from 'lucide-react'
-import { AppSidebar } from '@/components/app/app-sidebar'
+
 import { DateRangePickerWithRange } from '@/components/app/date-range-picker'
 import { RecurringTransactionDialog } from '@/components/app/transaction-dialogs/recurring-transactions/recurring-transaction-dialog'
 import { TransactionsTable } from '@/components/app/tables/transactions-table'
@@ -46,12 +46,8 @@ export default function RecurringTransactionsPage() {
   }, [])
 
   return (
-    <div className="flex h-screen w-full">
-      <div className="w-64 flex-shrink-0">
-        <AppSidebar />
-      </div>
-      <div className="flex-1">
-        <div className="container h-full flex flex-col px-4 py-8">
+    <div className="h-full flex flex-col">
+      <div className="container h-full flex flex-col mx-auto px-4 py-8">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
             <h1 className="text-3xl font-bold">Recurring Transactions</h1>
             <div className="flex flex-col md:flex-row items-end md:items-center gap-4">
@@ -156,7 +152,6 @@ export default function RecurringTransactionsPage() {
               />
             </CardContent>
           </div>
-        </div>
       </div>
 
       <RecurringTransactionDialog

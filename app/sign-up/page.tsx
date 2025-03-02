@@ -10,6 +10,9 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import Link from "next/link"
+import { createClient } from "@/utils/supabase/client"
+import { toast } from "sonner"
+import { useRouter } from "next/navigation"
 
 const formSchema = z.object({
   fullName: z.string().min(2, { message: "Full name must be at least 2 characters" }),
@@ -21,6 +24,8 @@ export default function SignUpPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
+  const router = useRouter()
+  const supabase = createClient()
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -33,18 +38,124 @@ export default function SignUpPage() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true)
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 2000))
-    console.log(values)
-    setIsLoading(false)
+
+    try {
+
+      // Sign up with Supabase
+      const { data, error } = await supabase.auth.signUp({
+        email: values.email,
+        password: values.password,
+        options: {
+          data: {
+            full_name: values.fullName,
+          },
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        },
+      })
+
+      if (error) {
+        console.error('Sign-up error:', error);
+        toast.error('Sign up failed', {
+          description: error.message
+        })
+        return
+      }
+
+      if (!data.user) {
+        console.error('No user data returned from sign-up');
+        toast.error('Failed to create account', {
+          description: 'Please try again'
+        })
+        return
+      }
+
+      console.log('Sign-up response:', {
+        user: {
+          id: data.user.id,
+          email: data.user.email,
+          emailConfirmed: data.user.email_confirmed_at,
+          createdAt: data.user.created_at
+        },
+        session: data.session ? 'exists' : 'none'
+      });
+      
+      // Log the user data for debugging
+      console.log('User created:', {
+        id: data.user.id,
+        email: data.user.email,
+        emailConfirmed: data.user.email_confirmed_at,
+        createdAt: data.user.created_at
+      });
+
+      // Create profile in the profiles table
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .upsert({
+          id: data.user.id,
+          email: values.email,
+          name: values.fullName,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'id'
+        })
+
+      if (profileError) {
+        console.error('Error creating profile:', profileError)
+        // Continue with sign-up process even if profile creation fails
+      } else {
+        console.log("Profile created successfully");
+      }
+
+      // If email confirmation is required
+      if (!data.session) {
+        toast.success('Sign up successful!', {
+          description: 'Please check your email (including spam folder) for the confirmation link.'
+        })
+        
+        // Wait a moment then show additional instructions
+        setTimeout(() => {
+          toast.info('Next steps:', {
+            description: '1. Click the confirmation link in your email\n2. Return here to sign in',
+            duration: 10000
+          })
+        }, 3000)
+      } else {
+        // User is automatically signed in (email confirmation disabled in Supabase)
+        toast.success('Sign up successful!', {
+          description: 'Your account has been created and you are now signed in.'
+        })
+        router.push('/')
+        router.refresh()
+      }
+
+    } catch (error: any) {
+      toast.error("Sign up failed", {
+        description: error.message || "Please try again"
+      })
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   async function handleGoogleSignUp() {
     setGoogleLoading(true)
-    // Simulate Google Sign Up
-    await new Promise((resolve) => setTimeout(resolve, 2000))
-    console.log("Google Sign Up")
-    setGoogleLoading(false)
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
+      })
+
+      if (error) {
+        throw error
+      }
+    } catch (error: any) {
+      toast.error("Google sign up failed", {
+        description: error.message || "Please try again later"
+      })
+      setGoogleLoading(false)
+    }
   }
 
   return (
@@ -167,3 +278,7 @@ export default function SignUpPage() {
   )
 }
 
+
+function setGoogleLoading(arg0: boolean) {
+  throw new Error("Function not implemented.")
+}

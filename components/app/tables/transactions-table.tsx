@@ -47,7 +47,7 @@ import { DateRange } from "react-day-picker"
 import { BulkCategoryChangeDialog } from "../bulk-category-change"
 
 interface Transaction {
-  id: string
+  id: number
   user_id: number
   name: string
   amount: number
@@ -67,22 +67,22 @@ interface Transaction {
 }
 
 interface TransactionsTableProps {
+  loading?: boolean
   showFilters?: boolean
   showPagination?: boolean
   showRowsCount?: boolean
   itemsPerPage?: number
-  maxTransactions?: number
   sortBy?: {
-    field: keyof Transaction
+    field: string
     order: 'asc' | 'desc'
   }
   className?: string
-  dateRange?: DateRange | undefined
+  dateRange?: DateRange
   data: Transaction[]
-  onDelete?: (id: string) => void
-  onBulkDelete?: (ids: string[]) => void
-  onEdit?: (id: string, formData: any) => void
-  onBulkEdit?: (ids: string[], changes: Partial<Transaction>) => void
+  onDelete?: (id: number) => void
+  onBulkDelete?: (ids: number[]) => void
+  onEdit?: (id: number, data: Partial<Transaction>) => void
+  onBulkEdit?: (ids: number[], changes: Partial<Transaction>) => void
   type?: 'recurring' | 'upcoming'
 }
 
@@ -91,7 +91,6 @@ export function TransactionsTable({
   showPagination = true,
   showRowsCount = true,
   itemsPerPage = 10,
-  maxTransactions,
   sortBy,
   className,
   dateRange,
@@ -109,7 +108,7 @@ export function TransactionsTable({
   const [globalFilter, setGlobalFilter] = React.useState("")
   const [editingTransaction, setEditingTransaction] = React.useState<Transaction | null>(null)
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = React.useState(false)
-  const [transactionToDelete, setTransactionToDelete] = React.useState<string | null>(null)
+  const [transactionToDelete, setTransactionToDelete] = React.useState<number | null>(null)
   const [isBulkCategoryDialogOpen, setIsBulkCategoryDialogOpen] = React.useState(false)
 
   const getCategoryName = (categoryId: number) => {
@@ -227,7 +226,7 @@ export function TransactionsTable({
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
               <DropdownMenuItem
                 onClick={() => {
-                  navigator.clipboard.writeText(transaction.id)
+                  navigator.clipboard.writeText(transaction.id.toString())
                 }}
               >
                 Copy transaction ID
@@ -282,7 +281,7 @@ export function TransactionsTable({
     },
   })
 
-  const handleDeleteTransaction = (id: string) => {
+  const handleDeleteTransaction = (id: number) => {
     onDelete?.(id)
     setIsConfirmDialogOpen(false)
     setTransactionToDelete(null)
@@ -346,7 +345,7 @@ export function TransactionsTable({
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={() => {
                   const selectedIds = Object.keys(rowSelection)
-                  onBulkDelete?.(selectedIds)
+                  onBulkDelete?.(selectedIds.map(Number))
                   setRowSelection({})
                 }}>
                   Delete Selected

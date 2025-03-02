@@ -1,49 +1,33 @@
-// components/auth/supabase-sync.tsx
 'use client';
+
 import { useEffect } from 'react';
-import { useAuth } from '@clerk/nextjs';
 import { createClient } from '@/utils/supabase/client';
+import { toast } from 'sonner';
 
 export const SupabaseAuthSync = () => {
-  const { getToken } = useAuth();
   const supabase = createClient();
 
   useEffect(() => {
-    const syncAuth = async () => {
-      try {
-        const token = await getToken({ template: 'supabase' });
-        if (!token) {
-          console.error('No Supabase token available');
-          return;
-        }
-
-        // Get the token from the cookie
-        const accessToken = document.cookie
-          .split('; ')
-          .find(row => row.startsWith('sb-access-token='))
-          ?.split('=')[1];
-
-        if (!accessToken) {
-          console.error('No access token found in cookies');
-          return;
-        }
-
-        // Set the session in Supabase
-        const { error: sessionError } = await supabase.auth.setSession({
-          access_token: accessToken,
-          refresh_token: accessToken,
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN') {
+        console.log('User signed in', session);
+      } else if (event === 'SIGNED_OUT') {
+        console.log('User signed out');
+      } else if (event === 'USER_UPDATED') {
+        console.log('User updated', session);
+      } else if (event === 'PASSWORD_RECOVERY') {
+        toast.info('Password recovery email sent', {
+          description: 'Check your email for the password reset link',
         });
-
-        if (sessionError) {
-          console.error('Error setting Supabase session:', sessionError);
-        }
-      } catch (error) {
-        console.error('Error syncing Supabase auth:', error);
       }
-    };
+    });
 
-    syncAuth();
-  }, [getToken]);
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [supabase.auth]);
 
   return null;
 };

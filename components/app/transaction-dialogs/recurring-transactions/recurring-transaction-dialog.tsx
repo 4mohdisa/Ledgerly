@@ -1,11 +1,11 @@
 "use client"
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { format } from "date-fns"
 import { CalendarIcon } from 'lucide-react'
-import { useUser } from "@clerk/nextjs"
+
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -44,9 +44,39 @@ import { accountTypes } from "@/data/account-types"
 import { transactionService } from '@/app/services/transaction-services'
 import { RecurringTransaction } from '@/app/types/transaction'
 import { BaseDialogProps, RecurringTransactionFormValues, recurringTransactionSchema } from '../shared/schema'
+import { createClient } from '@/utils/supabase/client'
+import { User } from '@supabase/supabase-js'
 
 interface RecurringTransactionDialogProps extends BaseDialogProps {
   onSubmit?: (data: RecurringTransactionFormValues) => void
+}
+
+function useUser() {
+  const [user, setUser] = useState<User | null>(null)
+  const supabase = createClient()
+
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { session }, error } = await supabase.auth.getSession()
+      if (error) {
+        console.error('Error fetching user:', error)
+        return
+      }
+      setUser(session?.user ?? null)
+    }
+
+    getUser()
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null)
+    })
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [supabase.auth])
+
+  return { user }
 }
 
 export function RecurringTransactionDialog({

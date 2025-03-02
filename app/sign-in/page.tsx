@@ -10,6 +10,9 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import Link from "next/link"
+import { useRouter, useSearchParams } from "next/navigation"
+import { createClient } from "@/utils/supabase/client"
+import { toast } from "sonner"
 
 const formSchema = z.object({
   email: z.string().email({ message: "Invalid email address" }),
@@ -20,6 +23,10 @@ export default function SignInPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const redirectUrl = searchParams?.get('redirect') || '/'
+  const supabase = createClient()
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -31,18 +38,85 @@ export default function SignInPage() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true)
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 2000))
-    console.log(values)
-    setIsLoading(false)
+    try {
+      console.log('Attempting sign in with:', values.email);
+      
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: values.email,
+        password: values.password,
+      })
+
+      if (error) {
+        console.error('Sign in error:', error);
+        
+        if (error.message.includes('Email not confirmed')) {
+          // Try to resend confirmation email
+          const { error: resendError } = await supabase.auth.resend({
+            type: 'signup',
+            email: values.email,
+          })
+          
+          if (resendError) {
+            console.error('Error resending confirmation:', resendError)
+            toast.error('Error sending confirmation email', {
+              description: 'Please try signing up again'
+            })
+          } else {
+            toast.info('Email confirmation required', {
+              description: 'We have sent a new confirmation email. Please check your inbox (and spam folder).'
+            })
+          }
+        } else if (error.message.includes('Invalid login credentials')) {
+          toast.error('Invalid credentials', {
+            description: 'Please check your email and password'
+          })
+        } else {
+          toast.error('Sign in failed', {
+            description: error.message
+          })
+        }
+        return
+      }
+
+      if (!data.user || !data.session) {
+        toast.error('Sign in failed', {
+          description: 'Unable to sign in'
+        })
+        return
+      }
+
+      toast.success('Signed in successfully')
+      // Use replace instead of push to avoid adding to history
+      router.replace(redirectUrl)
+    } catch (error: any) {
+      console.error('Sign in exception:', error);
+      toast.error('Sign in failed', {
+        description: error.message
+      })
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   async function handleGoogleSignIn() {
     setGoogleLoading(true)
-    // Simulate Google Sign In
-    await new Promise((resolve) => setTimeout(resolve, 2000))
-    console.log("Google Sign In")
-    setGoogleLoading(false)
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback?redirectUrl=${redirectUrl}`,
+        },
+      })
+
+      if (error) {
+        throw error
+      }
+    } catch (error: any) {
+      toast.error("Google sign in failed", {
+        description: error.message || "Please try again later"
+      })
+      setGoogleLoading(false)
+    }
   }
 
   return (
@@ -99,6 +173,11 @@ export default function SignInPage() {
                   </FormItem>
                 )}
               />
+              <div className="text-sm text-right">
+                <Link href="/forgot-password" className="text-primary hover:underline">
+                  Forgot password?
+                </Link>
+              </div>
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? (
                   <>
@@ -151,4 +230,3 @@ export default function SignInPage() {
     </div>
   )
 }
-

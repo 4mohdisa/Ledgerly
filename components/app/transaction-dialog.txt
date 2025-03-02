@@ -43,7 +43,6 @@ import { categories } from "@/data/categories"
 import { accountTypes } from "@/data/account-types"
 import { transactionService } from '@/app/services/transaction-services'
 import { RecurringTransaction, Transaction } from '@/app/types/transaction'
-import { useUser } from "@clerk/nextjs";
 import { useState } from "react";
 
 const baseSchema = {
@@ -443,5 +442,9 @@ export function TransactionDialog({
       </DialogContent>
     </Dialog>
   )
+}
+
+function useUser(): { user: any } {
+  throw new Error('Function not implemented.')
 }
 

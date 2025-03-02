@@ -1,11 +1,11 @@
 "use client"
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { format } from "date-fns"
 import { CalendarIcon } from 'lucide-react'
-import { useUser } from "@clerk/nextjs"
+
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -39,11 +39,12 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 
 import { transactionTypes } from "@/data/transactiontypes"
 import { frequencies } from "@/data/frequencies"
-import { categories } from "@/data/categories"
+import { useCategories } from "@/hooks/use-categories"
 import { accountTypes } from "@/data/account-types"
 import { transactionService } from '@/app/services/transaction-services'
 import { Transaction } from '@/app/types/transaction'
 import { BaseDialogProps, TransactionFormValues, transactionSchema } from '../shared/schema'
+import { useAuth } from '@/context/auth-context'
 
 interface TransactionDialogProps extends BaseDialogProps {
   onSubmit?: (data: TransactionFormValues) => void
@@ -56,7 +57,9 @@ export function TransactionDialog({
   initialData,
   mode,
 }: TransactionDialogProps) {
-  const { user } = useUser()
+  const { user } = useAuth()
+  const { categories, loading: categoriesLoading, error: categoriesError } = useCategories()
+  console.log('TransactionDialog - categories:', { categories, loading: categoriesLoading, error: categoriesError })
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const form = useForm<TransactionFormValues>({
@@ -85,14 +88,35 @@ export function TransactionDialog({
     setIsSubmitting(true)
 
     try {
+      if (categoriesLoading) {
+        throw new Error('Categories are still loading. Please try again.')
+      }
+
+      if (categoriesError) {
+        throw new Error('Failed to load categories. Please refresh the page.')
+      }
+
+      // Validate and log category selection
+      const categoryId = Number(data.category_id)
+      const selectedCategory = categories.find(cat => cat.id === categoryId)
+      console.log('Category validation:', {
+        categoryId,
+        selectedCategory,
+        allCategories: categories.map(c => ({ id: c.id, name: c.name }))
+      })
+      
+      if (!selectedCategory) {
+        throw new Error(`Category ${categoryId} not found. Please select a valid category.`)
+      }
+
       const submissionData = {
         ...data,
-        category_id: Number(data.category_id),
+        category_id: categoryId,
         created_at: mode === 'create' ? new Date().toISOString() : undefined,
         updated_at: new Date().toISOString(),
       }
 
-      await transactionService.createTransaction(submissionData as Transaction, user.id)
+      await transactionService.createTransaction(submissionData as Transaction)
 
       toast.success(`${mode === 'create' ? 'Created' : 'Updated'} transaction`, {
         description: "Your transaction has been successfully saved.",
@@ -290,7 +314,7 @@ export function TransactionDialog({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {categories.map((category) => (
+                        {categories?.map((category) => (
                           <SelectItem key={category.id} value={String(category.id)}>
                             {category.name}
                           </SelectItem>
