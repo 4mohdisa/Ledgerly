@@ -45,26 +45,8 @@ import { ConfirmationDialog } from "../confirmation-dialog"
 import { TransactionDialog } from "../transaction-dialogs/transactions/transaction-dialog"
 import { DateRange } from "react-day-picker"
 import { BulkCategoryChangeDialog } from "../bulk-category-change"
-
-interface Transaction {
-  id: number
-  user_id: number
-  name: string
-  amount: number
-  description?: string
-  date?: string
-  start_date?: string
-  end_date?: string | null
-  file_id?: number
-  type: string
-  account_type: string
-  category_id: number
-  category_name: string
-  recurring_frequency?: string
-  frequency?: string
-  created_at: string
-  updated_at: string
-}
+import { Transaction } from "@/app/types/transaction"
+import { TransactionFormValues } from "../transaction-dialogs/shared/schema"
 
 interface TransactionsTableProps {
   loading?: boolean
@@ -107,9 +89,11 @@ export function TransactionsTable({
   const [rowSelection, setRowSelection] = React.useState({})
   const [globalFilter, setGlobalFilter] = React.useState("")
   const [editingTransaction, setEditingTransaction] = React.useState<Transaction | null>(null)
+  const [transactionDialogData, setTransactionDialogData] = React.useState<Partial<TransactionFormValues>>({})
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = React.useState(false)
   const [transactionToDelete, setTransactionToDelete] = React.useState<number | null>(null)
   const [isBulkCategoryDialogOpen, setIsBulkCategoryDialogOpen] = React.useState(false)
+  const [isTransactionDialogOpen, setIsTransactionDialogOpen] = React.useState(false)
 
   const getCategoryName = (categoryId: number) => {
     return categories.find(cat => cat.id === categoryId)?.name || 'Uncategorized'
@@ -232,7 +216,7 @@ export function TransactionsTable({
                 Copy transaction ID
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setEditingTransaction(transaction)}>
+              <DropdownMenuItem onClick={() => handleEditTransaction(transaction)}>
                 Edit transaction
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => {
@@ -287,11 +271,29 @@ export function TransactionsTable({
     setTransactionToDelete(null)
   }
 
-  const handleEditTransaction = (formData: any) => {
-    if (editingTransaction) {
-      onEdit?.(editingTransaction.id, formData)
-      setEditingTransaction(null)
+  const handleEditTransaction = (transaction: Transaction) => {
+    // Only include fields that match TransactionFormValues schema
+    const formData: Partial<TransactionFormValues> = {
+      name: transaction.name,
+      amount: transaction.amount,
+      date: new Date(transaction.date),
+      type: transaction.type as TransactionFormValues['type'] || 'expense',
+      account_type: transaction.account_type as TransactionFormValues['account_type'] || 'cash',
+      category_id: String(transaction.category_id || ''),
+      // Optional fields
+      description: transaction.description || undefined,
+      recurring_frequency: transaction.recurring_frequency as TransactionFormValues['recurring_frequency'],
+      // Only include valid datetime strings for created_at and updated_at
+      ...(transaction.created_at && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(transaction.created_at) && {
+        created_at: transaction.created_at
+      }),
+      ...(transaction.updated_at && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(transaction.updated_at) && {
+        updated_at: transaction.updated_at
+      })
     }
+    setEditingTransaction(transaction)
+    setTransactionDialogData(formData)
+    setIsTransactionDialogOpen(true)
   }
 
   function handleBulkCategoryChange(categoryId: number): void {
@@ -438,15 +440,26 @@ export function TransactionsTable({
       )}
 
       <TransactionDialog
-        isOpen={!!editingTransaction}
-        onClose={() => setEditingTransaction(null)}
-        onSubmit={handleEditTransaction}
-        initialData={editingTransaction ? {
-          ...editingTransaction,
-          date: editingTransaction.date ? new Date(editingTransaction.date) : new Date(),
-          category_id: editingTransaction.category_id.toString()
-        } : undefined}
-        mode="edit"      />
+        isOpen={isTransactionDialogOpen}
+        onClose={() => setIsTransactionDialogOpen(false)}
+        onSubmit={(formData) => {
+          if (editingTransaction) {
+            // Convert form data to match Transaction type
+            const transactionData: Partial<Transaction> = {
+              ...formData,
+              // Convert Date to ISO string (YYYY-MM-DD)
+              date: formData.date.toISOString().split('T')[0],
+              // Ensure category_id is a number or null
+              category_id: formData.category_id ? Number(formData.category_id) : null
+            }
+            onEdit?.(editingTransaction.id, transactionData)
+            setIsTransactionDialogOpen(false)
+            setEditingTransaction(null)
+          }
+        }}
+        initialData={transactionDialogData}
+        mode="edit"
+      />
 
       <ConfirmationDialog
         isOpen={isConfirmDialogOpen}
@@ -456,7 +469,7 @@ export function TransactionsTable({
         description="Are you sure you want to delete this transaction?"
       />
 
-<BulkCategoryChangeDialog
+      <BulkCategoryChangeDialog
         isOpen={isBulkCategoryDialogOpen}
         onClose={() => setIsBulkCategoryDialogOpen(false)}
         onSave={handleBulkCategoryChange}

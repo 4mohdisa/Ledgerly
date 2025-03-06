@@ -42,7 +42,7 @@ import { frequencies } from "@/data/frequencies"
 import { categories } from "@/data/categories"
 import { accountTypes } from "@/data/account-types"
 import { transactionService } from '@/app/services/transaction-services'
-import { RecurringTransaction } from '@/app/types/transaction'
+import { RecurringTransaction, UpdateRecurringTransaction } from '@/app/types/transaction'
 import { BaseDialogProps, RecurringTransactionFormValues, recurringTransactionSchema } from '../shared/schema'
 import { createClient } from '@/utils/supabase/client'
 import { User } from '@supabase/supabase-js'
@@ -122,7 +122,7 @@ export function RecurringTransactionDialog({
         updated_at: new Date().toISOString(),
       }
 
-      await transactionService.createRecurringTransaction(submissionData as RecurringTransaction, user.id)
+      await transactionService.createRecurringTransaction(submissionData as unknown as RecurringTransaction, user.id)
 
       toast.success(`${mode === 'create' ? 'Created' : 'Updated'} recurring transaction`, {
         description: "Your recurring transaction has been successfully saved.",

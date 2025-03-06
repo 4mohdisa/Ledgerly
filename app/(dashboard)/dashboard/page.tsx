@@ -11,6 +11,10 @@ import { TransactionChart } from "@/components/app/charts/bar-chart-interactive"
 import { NetBalanceChart } from "@/components/app/charts/line-chart"
 import { DateRange } from "react-day-picker"
 import { startOfMonth, endOfMonth, format, isFirstDayOfMonth } from "date-fns"
+import { useAuth } from '@/context/auth-context'
+import { toast } from 'sonner'
+import { createClient } from '@/utils/supabase/client'
+import { Transaction, UpdateTransaction } from '@/app/types/transaction'
 import { BalanceDialog } from "@/components/app/balance-dialog"
 import { TransactionDialog } from "@/components/app/transaction-dialogs/transactions/transaction-dialog"
 import { UploadDialog } from "@/components/app/upload-dialog"
@@ -22,7 +26,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { MonthPicker } from '@/components/app/month-picker'
-import { transactions } from '@/data/transactions'
+import { useTransactions } from '@/hooks/use-transactions'
 
 // Define default date range outside the component
 const defaultDateRange = {
@@ -31,19 +35,14 @@ const defaultDateRange = {
 }
 
 export default function DashboardPage() {
-  const [isLoading, setIsLoading] = useState(true)
+  const { user } = useAuth()
   const [isAddTransactionOpen, setIsAddTransactionOpen] = useState(false)
   const [isUploadFileOpen, setIsUploadFileOpen] = useState(false)
   const [isBalanceDialogOpen, setIsBalanceDialogOpen] = useState(false)
   const [isEditingBalance, setIsEditingBalance] = useState(false)
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
   const [dateRange, setDateRange] = useState<DateRange | undefined>(defaultDateRange)
-
-  useEffect(() => {
-    // Simulate loading time
-    const timer = setTimeout(() => setIsLoading(false), 2000)
-    return () => clearTimeout(timer)
-  }, [])
+  const { transactions: transactionsList, loading: isLoading, error } = useTransactions(dateRange)
 
   const handleAddTransaction = useCallback(() => {
     setIsAddTransactionOpen(true)
@@ -85,11 +84,93 @@ export default function DashboardPage() {
     }
   }
 
-  const handleBulkEdit = useCallback((ids: string[], changes: Partial<any>) => {
-    setTransactionsList(prev => prev.map((transaction: { id: string }) =>
-      ids.includes(transaction.id) ? { ...transaction, ...changes } : transaction
-    ))
-  }, [])
+  const handleDeleteTransaction = useCallback(async (id: number) => {
+    if (!user?.id) {
+      toast.error('Authentication required')
+      return
+    }
+
+    try {
+      const supabase = createClient()
+      const { error } = await supabase
+        .from('transactions')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', user.id)
+
+      if (error) throw error
+      toast.success('Transaction deleted successfully')
+    } catch (error) {
+      console.error('Error deleting transaction:', error)
+      toast.error('Failed to delete transaction')
+    }
+  }, [user])
+
+  const handleBulkDelete = useCallback(async (ids: number[]) => {
+    if (!user?.id) {
+      toast.error('Authentication required')
+      return
+    }
+
+    try {
+      const supabase = createClient()
+      const { error } = await supabase
+        .from('transactions')
+        .delete()
+        .in('id', ids)
+        .eq('user_id', user.id)
+
+      if (error) throw error
+      toast.success('Transactions deleted successfully')
+    } catch (error) {
+      console.error('Error deleting transactions:', error)
+      toast.error('Failed to delete transactions')
+    }
+  }, [user])
+
+  const handleEditTransaction = useCallback(async (id: number, formData: Partial<UpdateTransaction>) => {
+    if (!user?.id) {
+      toast.error('Authentication required')
+      return
+    }
+
+    try {
+      const supabase = createClient()
+      const { error } = await supabase
+        .from('transactions')
+        .update(formData)
+        .eq('id', id)
+        .eq('user_id', user.id)
+
+      if (error) throw error
+      toast.success('Transaction updated successfully')
+    } catch (error) {
+      console.error('Error updating transaction:', error)
+      toast.error('Failed to update transaction')
+    }
+  }, [user])
+
+  const handleBulkEdit = useCallback(async (ids: number[], changes: Partial<UpdateTransaction>) => {
+    if (!user?.id) {
+      toast.error('Authentication required')
+      return
+    }
+
+    try {
+      const supabase = createClient()
+      const { error } = await supabase
+        .from('transactions')
+        .update(changes)
+        .in('id', ids)
+        .eq('user_id', user.id)
+
+      if (error) throw error
+      toast.success('Transactions updated successfully')
+    } catch (error) {
+      console.error('Error updating transactions:', error)
+      toast.error('Failed to update transactions')
+    }
+  }, [user])
 
   const dateRangeValue = useMemo(() => dateRange ?? defaultDateRange, [dateRange])
 
@@ -164,7 +245,21 @@ export default function DashboardPage() {
           </div>
 
           <TransactionsTable
-            data={transactions} />
+            data={transactionsList}
+            loading={isLoading}
+            showFilters={false}
+            showPagination={true}
+            showRowsCount={true}
+            itemsPerPage={5}
+            sortBy={{
+              field: "date",
+              order: "desc"
+            }}
+            onDelete={handleDeleteTransaction}
+            onBulkDelete={handleBulkDelete}
+            onEdit={handleEditTransaction}
+            onBulkEdit={handleBulkEdit}
+          />
         </div>
       </div>
 

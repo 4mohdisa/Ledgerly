@@ -6,9 +6,7 @@ import { Transaction } from '@/app/types/transaction'
 import { DateRange } from 'react-day-picker'
 import { useAuth } from '@/context/auth-context'
 
-type TransactionResponse = Omit<Transaction, 'id'> & {
-  id: number
-}
+type TransactionResponse = Transaction
 
 export function useTransactions(dateRange?: DateRange) {
   const [transactions, setTransactions] = useState<Transaction[]>([])

@@ -139,7 +139,7 @@ export default function TransactionsPage() {
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
             <h1 className="text-3xl font-bold">Transactions</h1>
             <div className="flex flex-col md:flex-row items-end md:items-center gap-4">
-              <DateRangePickerWithRange onDateRangeChange={handleDateRangeChange} />
+              <DateRangePickerWithRange dateRange={dateRange} onDateRangeChange={handleDateRangeChange} />
               <div className="flex gap-4 ml-auto">
                 <div className="md:hidden w-full">
                   <DropdownMenu>

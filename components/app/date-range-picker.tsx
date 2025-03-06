@@ -25,6 +25,20 @@ export function DateRangePickerWithRange({
   onDateRangeChange,
 }: DateRangePickerProps) {
   const [isOpen, setIsOpen] = React.useState(false)
+  const [date, setDate] = React.useState<DateRange | undefined>(dateRange)
+
+  // Update internal state when prop changes
+  React.useEffect(() => {
+    setDate(dateRange)
+  }, [dateRange])
+
+  const handleSelect = (range: DateRange | undefined) => {
+    setDate(range)
+    onDateRangeChange?.(range)
+    if (range?.from && range?.to) {
+      setIsOpen(false)
+    }
+  }
 
   return (
     <div className={cn("grid gap-2", className)}>
@@ -35,18 +49,18 @@ export function DateRangePickerWithRange({
             variant={"outline"}
             className={cn(
               "w-[300px] justify-start text-left font-normal",
-              !dateRange && "text-muted-foreground"
+              !date && "text-muted-foreground"
             )}
           >
             <CalendarIcon className="mr-2 h-4 w-4" />
-            {dateRange?.from ? (
-              dateRange.to ? (
+            {date?.from ? (
+              date.to ? (
                 <>
-                  {format(dateRange.from, "LLL dd, y")} -{" "}
-                  {format(dateRange.to, "LLL dd, y")}
+                  {format(date.from, "LLL dd, y")} -{" "}
+                  {format(date.to, "LLL dd, y")}
                 </>
               ) : (
-                format(dateRange.from, "LLL dd, y")
+                format(date.from, "LLL dd, y")
               )
             ) : (
               <span>Pick a date range</span>
@@ -57,14 +71,9 @@ export function DateRangePickerWithRange({
           <Calendar
             initialFocus
             mode="range"
-            defaultMonth={dateRange?.from}
-            selected={dateRange}
-            onSelect={(range) => {
-              onDateRangeChange?.(range)
-              if (range?.from && range?.to) {
-                setIsOpen(false)
-              }
-            }}
+            defaultMonth={date?.from}
+            selected={date}
+            onSelect={handleSelect}
             numberOfMonths={2}
           />
         </PopoverContent>
