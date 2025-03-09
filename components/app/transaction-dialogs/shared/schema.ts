@@ -1,7 +1,9 @@
 import { z } from "zod"
-import { transactionTypes } from "@/data/transactiontypes"
-import { frequencies } from "@/data/frequencies"
-import { accountTypes } from "@/data/account-types"
+import { transactionTypes, TransactionType } from "@/data/transactiontypes"
+import { frequencies, FrequencyType } from "@/data/frequencies"
+import { accountTypes, AccountType } from "@/data/account-types"
+
+const frequencyEnum = z.enum(['never', ...frequencies] as [string, ...string[]])
 
 export const baseSchema = {
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
@@ -9,8 +11,8 @@ export const baseSchema = {
     .number()
     .positive({ message: "Amount must be a positive number." })
     .max(100000000, { message: "Amount exceeds maximum limit of $100,000,000." }),
-  type: z.enum(transactionTypes as [string, ...string[]]),
-  account_type: z.enum(accountTypes as [string, ...string[]]),
+  type: z.custom<TransactionType>((val) => transactionTypes.includes(val as any)),
+  account_type: z.custom<AccountType>((val) => accountTypes.includes(val as any)),
   category_id: z.string(),
   description: z.string().optional(),
   created_at: z.string().datetime({ offset: true }).optional(),
@@ -19,17 +21,26 @@ export const baseSchema = {
 
 export const transactionSchema = z.object({
   ...baseSchema,
-  date: z.date().refine(
+  date: z.date({
+    required_error: "Please select a date",
+    invalid_type_error: "Invalid date format",
+  }).refine(
     (date) => date <= new Date(),
     { message: "Transaction date cannot be in the future." }
   ),
-  recurring_frequency: z.enum(frequencies as [string, ...string[]]).optional(),
+  recurring_frequency: z.custom<FrequencyType>(),
+  // end_date removed as it's not needed for regular transactions
 })
 
 export const recurringTransactionSchema = z.object({
   ...baseSchema,
-  frequency: z.enum(frequencies as [string, ...string[]]),
-  start_date: z.date(),
+  frequency: z.custom<FrequencyType>((val) => 
+    frequencies.includes(val as any) && val !== "Never"
+  ),
+  start_date: z.date({
+    required_error: "Please select a start date",
+    invalid_type_error: "Invalid date format",
+  }),
   end_date: z.date().optional(),
 })
 

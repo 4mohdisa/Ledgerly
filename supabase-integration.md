@@ -372,3 +372,107 @@ SupabaseAuthSync.tsx - Handles the core authentication sync between Clerk and Su
 user-sync-provider.tsx - Manages user state and synchronization
 /utils/supabase/middleware.ts - Handles authentication in API routes and server-side
 /middleware.ts - Global middleware for authentication flow
+
+
+Below is my file structure:
+
+app
+├── (dashboard)
+│   ├── dashboard
+│   │   └── page.tsx
+│   ├── layout.tsx
+│   ├── recurring-transactions
+│   │   └── page.tsx
+│   └── transactions
+│       └── page.tsx
+├── api
+│   └── auth
+│       └── sign-out
+│           └── route.ts
+├── auth
+│   └── callback
+│       └── route.ts
+├── auth-error
+│   └── page.tsx
+├── favicon.ico
+├── fonts
+│   ├── GeistMonoVF.woff
+│   └── GeistVF.woff
+├── forgot-password
+│   └── page.tsx
+├── globals.css
+├── layout.tsx
+├── metadata.ts
+├── page.tsx
+├── recurring-transactions
+├── reset-password
+│   └── page.tsx
+├── services
+│   ├── transaction-services.ts
+│   └── transaction-services.tsx
+├── sign-in
+│   └── page.tsx
+├── sign-up
+│   └── page.tsx
+├── transactions
+└── types
+    ├── transaction.d.ts
+    └── transaction.ts
+components
+├── SupabaseAuthSync.tsx
+├── app
+│   ├── app-sidebar.tsx
+│   ├── balance-dialog.tsx
+│   ├── bulk-category-change.tsx
+│   ├── charts
+│   │   ├── bar-chart-interactive.tsx
+│   │   ├── bar-chart-multiple.tsx
+│   │   ├── line-chart.tsx
+│   │   └── pie-donut-chart.tsx
+│   ├── confirmation-dialog.tsx
+│   ├── date-range-picker.tsx
+│   ├── metrics-cards.tsx
+│   ├── month-picker.tsx
+│   ├── tables
+│   │   └── transactions-table.tsx
+│   ├── transaction-dialog.txt
+│   ├── transaction-dialogs
+│   │   ├── recurring-transactions
+│   │   │   └── recurring-transaction-dialog.tsx
+│   │   ├── shared
+│   │   │   └── schema.ts
+│   │   └── transactions
+│   │       └── transaction-dialog.tsx
+│   └── upload-dialog.tsx
+├── auth
+│   └── supabase-sync.tsx
+├── providers
+│   └── user-sync-provider.tsx
+└── ui
+    ├── alert-dialog.tsx
+    ├── avatar.tsx
+    ├── badge.tsx
+    ├── button.tsx
+    ├── calendar.tsx
+    ├── card.tsx
+    ├── chart.tsx
+    ├── checkbox.tsx
+    ├── dialog.tsx
+    ├── dropdown-menu.tsx
+    ├── form.tsx
+    ├── input.tsx
+    ├── label.tsx
+    ├── pagination.tsx
+    ├── popover.tsx
+    ├── progress.tsx
+    ├── select.tsx
+    ├── separator.tsx
+    ├── sheet.tsx
+    ├── sidebar.tsx
+    ├── skeleton.tsx
+    ├── sonner.tsx
+    ├── table.tsx
+    ├── tabs.tsx
+    ├── textarea.tsx
+    ├── toast.tsx
+    └── tooltip.tsx

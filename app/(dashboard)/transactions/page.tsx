@@ -7,7 +7,7 @@ import { TransactionsTable } from "@/components/app/tables/transactions-table"
 import { DateRangePickerWithRange } from '@/components/app/date-range-picker'
 import { TransactionDialog } from '@/components/app/transaction-dialogs/transactions/transaction-dialog'
 import { DateRange } from "react-day-picker"
-import { startOfMonth, endOfMonth, format } from "date-fns"
+import { startOfMonth, endOfMonth } from "date-fns"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,7 +18,7 @@ import { useTransactions } from '@/hooks/use-transactions'
 import { useAuth } from '@/context/auth-context'
 import { toast } from 'sonner'
 import { createClient } from '@/utils/supabase/client'
-import { Transaction, UpdateTransaction } from '@/app/types/transaction'
+import { UpdateTransaction } from '@/app/types/transaction'
 
 export default function TransactionsPage() {
   const { user } = useAuth()
@@ -27,23 +27,32 @@ export default function TransactionsPage() {
     from: startOfMonth(new Date()),
     to: endOfMonth(new Date())
   })
-  const { transactions: transactionsList, loading, error } = useTransactions(dateRange)
+  const { transactions: transactionsList, loading, error, refresh } = useTransactions(dateRange)
 
   const handleAddTransaction = useCallback(() => {
     setIsAddTransactionOpen(true)
   }, [])
 
   const handleDateRangeChange = useCallback((newDateRange: DateRange | undefined) => {
-    setDateRange(newDateRange ? {
-      from: startOfMonth(newDateRange.from || new Date()),
-      to: endOfMonth(newDateRange.to || newDateRange.from || new Date())
-    } : undefined)
+    if (!newDateRange) {
+      // If date range is cleared, show all transactions from the current month
+      setDateRange(undefined)
+      return
+    }
+    
+    // Use the exact dates selected by the user
+    setDateRange({
+      from: newDateRange.from,
+      to: newDateRange.to || newDateRange.from
+    })
   }, [])
 
   const handleTransactionSubmit = useCallback(async () => {
     // Transaction is created through the dialog and will be fetched automatically
     setIsAddTransactionOpen(false)
-  }, [])
+    // Refresh the transactions list after adding a new transaction
+    refresh()
+  }, [refresh])
 
   const handleDeleteTransaction = useCallback(async (id: number) => {
     if (!user?.id) {
@@ -60,12 +69,15 @@ export default function TransactionsPage() {
         .eq('user_id', user.id)
 
       if (error) throw error
+      
+      // Refresh the transactions list after deletion
+      refresh()
       toast.success('Transaction deleted successfully')
     } catch (error) {
       console.error('Error deleting transaction:', error)
       toast.error('Failed to delete transaction')
     }
-  }, [user])
+  }, [user, refresh])
 
   const handleBulkDelete = useCallback(async (ids: number[]) => {
     if (!user?.id) {
@@ -82,12 +94,15 @@ export default function TransactionsPage() {
         .eq('user_id', user.id)
 
       if (error) throw error
+      
+      // Refresh the transactions list after bulk deletion
+      refresh()
       toast.success('Transactions deleted successfully')
     } catch (error) {
       console.error('Error deleting transactions:', error)
       toast.error('Failed to delete transactions')
     }
-  }, [user])
+  }, [user, refresh])
 
   const handleEditTransaction = useCallback(async (id: number, formData: Partial<UpdateTransaction>) => {
     if (!user?.id) {
@@ -96,20 +111,44 @@ export default function TransactionsPage() {
     }
 
     try {
+      console.log('Editing transaction:', id, formData)
+      
+      const supabaseData: Record<string, any> = {}
+      
+      // Process all fields in the form data
+      Object.keys(formData).forEach(key => {
+        if (key === 'date') {
+          if (formData.date) {
+            // Convert Date objects to ISO string format for Supabase
+            supabaseData.date = formData.date instanceof Date 
+              ? formData.date.toISOString() 
+              : formData.date
+          }
+        } else {
+          // Copy all other fields as-is
+          supabaseData[key] = formData[key as keyof typeof formData]
+        }
+      })
+
+      console.log('Prepared data for Supabase:', supabaseData)
+
       const supabase = createClient()
       const { error } = await supabase
         .from('transactions')
-        .update(formData)
+        .update(supabaseData)
         .eq('id', id)
         .eq('user_id', user.id)
 
       if (error) throw error
+      
+      // Refresh transactions list after successful update
+      refresh()
       toast.success('Transaction updated successfully')
     } catch (error) {
       console.error('Error updating transaction:', error)
       toast.error('Failed to update transaction')
     }
-  }, [user])
+  }, [user, refresh])
 
   const handleBulkEdit = useCallback(async (ids: number[], changes: Partial<UpdateTransaction>) => {
     if (!user?.id) {
@@ -118,20 +157,37 @@ export default function TransactionsPage() {
     }
 
     try {
+      const supabaseData: Record<string, any> = {}
+      
+      Object.keys(changes).forEach(key => {
+        if (key === 'date') {
+          if (changes.date) {
+            supabaseData.date = changes.date instanceof Date 
+              ? changes.date.toISOString() 
+              : changes.date
+          }
+        } else {
+          supabaseData[key] = changes[key as keyof typeof changes]
+        }
+      })
+
       const supabase = createClient()
       const { error } = await supabase
         .from('transactions')
-        .update(changes)
+        .update(supabaseData)
         .in('id', ids)
         .eq('user_id', user.id)
 
       if (error) throw error
+      
+      // Refresh the transactions list after bulk edit
+      refresh()
       toast.success('Transactions updated successfully')
     } catch (error) {
       console.error('Error updating transactions:', error)
       toast.error('Failed to update transactions')
     }
-  }, [user])
+  }, [user, refresh])
 
   return (
     <div className="h-full flex flex-col">

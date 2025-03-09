@@ -37,17 +37,18 @@ import {
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
-import { transactionTypes } from "@/data/transactiontypes"
-import { frequencies } from "@/data/frequencies"
+import { transactionTypes, TransactionType } from "@/data/transactiontypes"
+import { frequencies, frequencyLabels, FrequencyType } from "@/data/frequencies"
 import { useCategories } from "@/hooks/use-categories"
-import { accountTypes } from "@/data/account-types"
+import { accountTypes, AccountType } from "@/data/account-types"
 import { transactionService } from '@/app/services/transaction-services'
-import { Transaction } from '@/app/types/transaction'
 import { BaseDialogProps, TransactionFormValues, transactionSchema } from '../shared/schema'
 import { useAuth } from '@/context/auth-context'
 
-interface TransactionDialogProps extends BaseDialogProps {
-  onSubmit?: (data: TransactionFormValues) => void
+interface TransactionDialogProps extends Omit<BaseDialogProps, 'mode'> {
+  initialData?: Partial<TransactionFormValues>;
+  mode: 'create' | 'edit';
+  onSubmit?: (data: TransactionFormValues) => void;
 }
 
 export function TransactionDialog({
@@ -55,7 +56,7 @@ export function TransactionDialog({
   onClose,
   onSubmit,
   initialData,
-  mode,
+  mode = 'create'
 }: TransactionDialogProps) {
   const { user } = useAuth()
   const { categories, loading: categoriesLoading, error: categoriesError } = useCategories()
@@ -68,14 +69,33 @@ export function TransactionDialog({
       name: "",
       description: "",
       amount: 0,
-      type: "expense",
-      account_type: "cash",
+      type: "Expense" as TransactionType,
+      account_type: "Cash" as AccountType,
       category_id: "",
-      date: new Date(),
-      recurring_frequency: "never",
+      date: new Date() as Date,
+      recurring_frequency: "Never" as FrequencyType,
       ...initialData,
     },
   })
+  
+  // Reset form when initialData changes or dialog opens
+  useEffect(() => {
+    if (isOpen && initialData) {
+      console.log('Resetting form with initialData:', initialData)
+      // Reset the form with the new values
+      form.reset({
+        name: "",
+        description: "",
+        amount: 0,
+        type: "Expense" as TransactionType,
+        account_type: "Cash" as AccountType,
+        category_id: "",
+        date: new Date() as Date,
+        recurring_frequency: "Never" as FrequencyType,
+        ...initialData,
+      })
+    }
+  }, [form, initialData, isOpen])
 
   const handleSubmit = async (data: TransactionFormValues) => {
     if (!user?.id) {
@@ -109,27 +129,112 @@ export function TransactionDialog({
         throw new Error(`Category ${categoryId} not found. Please select a valid category.`)
       }
 
-      const submissionData = {
-        ...data,
-        category_id: categoryId,
-        created_at: mode === 'create' ? new Date().toISOString() : undefined,
-        updated_at: new Date().toISOString(),
+      const now = new Date().toISOString()
+      let result;
+      
+      // Check if we're in edit mode - if so, we don't create a new transaction
+      // Instead, we'll just pass the data to the parent component via onSubmit
+      if (mode === 'edit') {
+        console.log('Edit mode - passing data to parent component', data)
+        // We don't need to do anything here - just pass the data to the parent
+        // component which will handle the update
+        result = { success: true }
+      } else if (data.recurring_frequency !== 'Never') {
+        // For recurring transactions, manually create both transaction and recurring transaction
+        // First, create the regular transaction
+        const transactionData = {
+          name: data.name,
+          amount: data.amount,
+          type: data.type as TransactionType,
+          account_type: data.account_type as AccountType,
+          category_id: categoryId,
+          description: data.description,
+          date: data.date.toISOString(),
+          created_at: now,
+          updated_at: now,
+          user_id: user.id,
+          recurring_frequency: data.recurring_frequency as FrequencyType
+        }
+        
+        // Create the transaction
+        const { transaction } = await transactionService.createTransaction(transactionData)
+        
+        // Then create the recurring transaction
+        const recurringData = {
+          user_id: user.id,
+          name: data.name,
+          amount: data.amount,
+          type: data.type as TransactionType,
+          account_type: data.account_type as AccountType,
+          category_id: categoryId,
+          description: data.description,
+          frequency: data.recurring_frequency as FrequencyType,
+          start_date: data.date.toISOString(),
+          end_date: null,
+          created_at: now,
+          updated_at: now
+        }
+        
+        // Create the recurring transaction
+        const recurringTransaction = await transactionService.createRecurringTransaction(recurringData)
+        
+        // Combine results
+        result = { transaction, recurringTransaction }
+      } else {
+        // For one-time transactions, use createTransaction
+        const transactionData = {
+          name: data.name,
+          amount: data.amount,
+          type: data.type as TransactionType,
+          account_type: data.account_type as AccountType,
+          category_id: categoryId,
+          description: data.description,
+          date: data.date.toISOString(),
+          created_at: now,
+          updated_at: now,
+          user_id: user.id,
+          recurring_frequency: 'Never' as FrequencyType
+        }
+        
+        result = await transactionService.createTransaction(transactionData)
       }
 
-      await transactionService.createTransaction(submissionData as Transaction)
-
-      toast.success(`${mode === 'create' ? 'Created' : 'Updated'} transaction`, {
-        description: "Your transaction has been successfully saved.",
-      })
+      if (result.transaction) {
+        toast.success(`${mode === 'create' ? 'Created' : 'Updated'} transaction`, {
+          description: `${data.name} - ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(data.amount)}`
+        })
+      }
+      
+      if (result.recurringTransaction) {
+        toast.success('Created recurring transaction', {
+          description: `This transaction will repeat ${frequencyLabels[data.recurring_frequency as FrequencyType]}`
+        })
+      }
 
       if (onSubmit) {
         onSubmit(data)
       }
+
+      form.reset()
       onClose()
     } catch (error) {
       console.error('Failed to submit transaction:', error)
+      let errorMessage = "Please try again."
+      
+      if (error instanceof Error) {
+        if (error.message.includes('user_id')) {
+          errorMessage = "Authentication required. Please sign in."
+        } else if (error.message.includes('date')) {
+          errorMessage = "Please select a valid date."
+        } else if (error.message.includes('frequency')) {
+          errorMessage = "Please select a valid recurring frequency."
+        } else {
+          errorMessage = error.message
+        }
+      }
+      
       toast.error("Failed to save transaction", {
-        description: error instanceof Error ? error.message : "Please try again.",
+        description: errorMessage
       })
     } finally {
       setIsSubmitting(false)
@@ -144,7 +249,7 @@ export function TransactionDialog({
             {mode === 'create' ? 'Create Transaction' : 'Edit Transaction'}
           </DialogTitle>
           <DialogDescription>
-            {mode === 'create' 
+            {mode === 'create'
               ? 'Add a new transaction to your records.'
               : 'Make changes to your transaction here.'}
           </DialogDescription>
@@ -231,11 +336,16 @@ export function TransactionDialog({
                           </Button>
                         </FormControl>
                       </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
+                      <PopoverContent className="w-auto p-0 pointer-events-auto" align="start">
                         <Calendar
                           mode="single"
                           selected={field.value}
-                          onSelect={field.onChange}
+                          onSelect={(date) => {
+                            if (date) {
+                              field.onChange(date)
+                              form.setValue('date', date)
+                            }
+                          }}
                           disabled={(date) =>
                             date > new Date() || date < new Date("1900-01-01")
                           }
@@ -331,7 +441,7 @@ export function TransactionDialog({
                 name="recurring_frequency"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Recurring Frequency</FormLabel>
+                    <FormLabel>Schedule Type</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger>
@@ -339,9 +449,10 @@ export function TransactionDialog({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {frequencies.map((frequency) => (
-                          <SelectItem key={frequency} value={frequency}>
-                            {frequency.charAt(0).toUpperCase() + frequency.slice(1)}
+                        <SelectItem value="Never">One-time Transaction</SelectItem>
+                        {frequencies.map((freq) => (
+                          <SelectItem key={freq} value={freq}>
+                            {frequencyLabels[freq]}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -351,6 +462,8 @@ export function TransactionDialog({
                 )}
               />
             </div>
+
+            {/* End Date field removed as requested */}
 
             {/* Description */}
             <div className="col-span-full">

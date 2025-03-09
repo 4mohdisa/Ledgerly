@@ -5,16 +5,20 @@ export type FrequencyType = 'Never' | 'Daily' | 'Weekly' | 'Bi-Weekly' | 'Tri-We
 export interface Transaction {
   id?: number;
   user_id: string;
-  date: Date;
+  date: Date | string;
   amount: number;
   name: string;
-  description?: string;
-  type: TransactionType;
-  account_type: AccountType;
+  description?: string | null;
+  type: string;
+  account_type: string;
   category_id: number;
-  recurring_frequency?: FrequencyType;
-  created_at?: string;
-  updated_at?: string;
+  category_name?: string | null;
+  recurring_frequency?: string | null;
+  file_id?: number | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  start_date?: Date | string;
+  end_date?: Date | string | null;
 }
 
 export interface RecurringTransaction {
@@ -22,13 +26,30 @@ export interface RecurringTransaction {
   user_id: string;
   name: string;
   amount: number;
-  type: TransactionType;
-  account_type: AccountType;
+  type: string;
+  account_type: string;
   category_id: number;
-  frequency: FrequencyType;
-  start_date: Date;
-  end_date?: Date;
-  description?: string;
-  created_at?: string;
-  updated_at?: string;
+  category_name?: string | null;
+  frequency: string;
+  start_date: Date | string;
+  end_date?: Date | string | null;
+  description?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export type UpdateTransaction = Partial<Omit<Transaction, 'id' | 'user_id'>>;
+export type UpdateRecurringTransaction = Partial<Omit<RecurringTransaction, 'id' | 'user_id'>>;
+
+export interface TransactionFormData {
+  name: string;
+  amount: number;
+  type: string;
+  account_type: string;
+  category_id: number;
+  description?: string | null;
+  date: Date;
+  schedule_type: string;
+  start_date?: Date | null;
+  end_date?: Date | null;
 }

@@ -94,6 +94,10 @@ export function TransactionsTable({
   const [transactionToDelete, setTransactionToDelete] = React.useState<number | null>(null)
   const [isBulkCategoryDialogOpen, setIsBulkCategoryDialogOpen] = React.useState(false)
   const [isTransactionDialogOpen, setIsTransactionDialogOpen] = React.useState(false)
+  
+  // For bulk deletion
+  const [isBulkDeleteDialogOpen, setIsBulkDeleteDialogOpen] = React.useState(false)
+  const [transactionsToDelete, setTransactionsToDelete] = React.useState<number[]>([])
 
   const getCategoryName = (categoryId: number) => {
     return categories.find(cat => cat.id === categoryId)?.name || 'Uncategorized'
@@ -210,7 +214,9 @@ export function TransactionsTable({
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
               <DropdownMenuItem
                 onClick={() => {
-                  navigator.clipboard.writeText(transaction.id.toString())
+                  if (transaction.id !== undefined) {
+                    navigator.clipboard.writeText(transaction.id.toString())
+                  }
                 }}
               >
                 Copy transaction ID
@@ -220,8 +226,10 @@ export function TransactionsTable({
                 Edit transaction
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => {
-                setTransactionToDelete(transaction.id)
-                setIsConfirmDialogOpen(true)
+                if (transaction.id !== undefined) {
+                  setTransactionToDelete(transaction.id)
+                  setIsConfirmDialogOpen(true)
+                }
               }}>
                 Delete transaction
               </DropdownMenuItem>
@@ -265,39 +273,69 @@ export function TransactionsTable({
     },
   })
 
-  const handleDeleteTransaction = (id: number) => {
-    onDelete?.(id)
-    setIsConfirmDialogOpen(false)
-    setTransactionToDelete(null)
+  const handleDeleteTransaction = (id: number | null) => {
+    if (id !== null && id !== undefined) {
+      // Call onDelete with the id (which is now guaranteed to be a number)
+      onDelete?.(id)
+      setIsConfirmDialogOpen(false)
+      setTransactionToDelete(null)
+    }
   }
 
   const handleEditTransaction = (transaction: Transaction) => {
+    console.log('Edit transaction called with:', transaction)
+    
     // Only include fields that match TransactionFormValues schema
     const formData: Partial<TransactionFormValues> = {
       name: transaction.name,
       amount: transaction.amount,
-      date: new Date(transaction.date),
-      type: transaction.type as TransactionFormValues['type'] || 'expense',
-      account_type: transaction.account_type as TransactionFormValues['account_type'] || 'cash',
-      category_id: String(transaction.category_id || ''),
+      // Ensure date is properly converted to a Date object
+      date: transaction.date instanceof Date ? transaction.date : new Date(transaction.date),
+      type: transaction.type as TransactionFormValues['type'],
+      account_type: transaction.account_type as TransactionFormValues['account_type'],
+      // Convert category_id to string (required by the form)
+      category_id: transaction.category_id ? String(transaction.category_id) : '',
       // Optional fields
-      description: transaction.description || undefined,
-      recurring_frequency: transaction.recurring_frequency as TransactionFormValues['recurring_frequency'],
-      // Only include valid datetime strings for created_at and updated_at
-      ...(transaction.created_at && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(transaction.created_at) && {
-        created_at: transaction.created_at
-      }),
-      ...(transaction.updated_at && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(transaction.updated_at) && {
-        updated_at: transaction.updated_at
-      })
+      description: transaction.description || '',
+      recurring_frequency: transaction.recurring_frequency as TransactionFormValues['recurring_frequency'] || 'Never',
     }
+    
+    console.log('Prepared form data:', formData)
+    
+    // Set the editing transaction and form data
     setEditingTransaction(transaction)
     setTransactionDialogData(formData)
     setIsTransactionDialogOpen(true)
   }
 
   function handleBulkCategoryChange(categoryId: number): void {
-    throw new Error("Function not implemented.")
+    // Get the selected row indices
+    const selectedRowIndices = Object.keys(rowSelection)
+    
+    if (selectedRowIndices.length === 0) {
+      return // No rows selected
+    }
+    
+    // Get the actual transaction IDs from the selected rows
+    const selectedTransactionIds = selectedRowIndices
+      .map(index => {
+        const row = table.getRowModel().rows[Number(index)]
+        const transaction = row?.original as Transaction
+        return transaction?.id
+      })
+      .filter((id): id is number => id !== undefined)
+    
+    console.log('Selected transaction IDs for category change:', selectedTransactionIds)
+    console.log('New category ID:', categoryId)
+    
+    if (selectedTransactionIds.length > 0) {
+      // Call the onBulkEdit function with the transaction IDs and the new category ID
+      onBulkEdit?.(selectedTransactionIds, { category_id: categoryId })
+      // Clear the selection
+      setRowSelection({})
+      // Close the dialog
+      setIsBulkCategoryDialogOpen(false)
+    }
   }
 
   return (
@@ -346,9 +384,29 @@ export function TransactionsTable({
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={() => {
-                  const selectedIds = Object.keys(rowSelection)
-                  onBulkDelete?.(selectedIds.map(Number))
-                  setRowSelection({})
+                  // Get the selected row indices
+                  const selectedRowIndices = Object.keys(rowSelection)
+                  
+                  if (selectedRowIndices.length === 0) {
+                    return // No rows selected
+                  }
+                  
+                  // Get the actual transaction IDs from the selected rows
+                  const selectedTransactionIds = selectedRowIndices
+                    .map(index => {
+                      const row = table.getRowModel().rows[Number(index)]
+                      const transaction = row?.original as Transaction
+                      return transaction?.id
+                    })
+                    .filter((id): id is number => id !== undefined)
+                  
+                  console.log('Selected transaction IDs for deletion:', selectedTransactionIds)
+                  
+                  if (selectedTransactionIds.length > 0) {
+                    // Store the IDs and open the confirmation dialog
+                    setTransactionsToDelete(selectedTransactionIds)
+                    setIsBulkDeleteDialogOpen(true)
+                  }
                 }}>
                   Delete Selected
                 </DropdownMenuItem>
@@ -441,20 +499,28 @@ export function TransactionsTable({
 
       <TransactionDialog
         isOpen={isTransactionDialogOpen}
-        onClose={() => setIsTransactionDialogOpen(false)}
+        onClose={() => {
+          setIsTransactionDialogOpen(false)
+          setEditingTransaction(null)
+          setTransactionDialogData({})
+        }}
         onSubmit={(formData) => {
           if (editingTransaction) {
             // Convert form data to match Transaction type
             const transactionData: Partial<Transaction> = {
               ...formData,
-              // Convert Date to ISO string (YYYY-MM-DD)
-              date: formData.date.toISOString().split('T')[0],
-              // Ensure category_id is a number or null
-              category_id: formData.category_id ? Number(formData.category_id) : null
+              // Convert Date to ISO string
+              date: formData.date instanceof Date ? formData.date.toISOString() : formData.date,
+              // Ensure category_id is a number or undefined (not null)
+              category_id: formData.category_id ? Number(formData.category_id) : undefined
             }
-            onEdit?.(editingTransaction.id, transactionData)
+            // Make sure editingTransaction.id is defined before calling onEdit
+            if (editingTransaction.id !== undefined) {
+              onEdit?.(editingTransaction.id, transactionData)
+            }
             setIsTransactionDialogOpen(false)
             setEditingTransaction(null)
+            setTransactionDialogData({})
           }
         }}
         initialData={transactionDialogData}
@@ -463,10 +529,40 @@ export function TransactionsTable({
 
       <ConfirmationDialog
         isOpen={isConfirmDialogOpen}
-        onClose={() => setIsConfirmDialogOpen(false)}
-        onConfirm={() => transactionToDelete && handleDeleteTransaction(transactionToDelete)}
+        onClose={() => {
+          setIsConfirmDialogOpen(false)
+          setTransactionToDelete(null)
+        }}
+        onConfirm={() => {
+          // Only call handleDeleteTransaction if transactionToDelete is a number
+          if (typeof transactionToDelete === 'number') {
+            handleDeleteTransaction(transactionToDelete)
+          }
+        }}
         title="Delete Transaction"
-        description="Are you sure you want to delete this transaction?"
+        description="Are you sure you want to delete this transaction? This action cannot be undone."
+      />
+
+      {/* Confirmation dialog for bulk deletion */}
+      <ConfirmationDialog
+        isOpen={isBulkDeleteDialogOpen}
+        onClose={() => {
+          setIsBulkDeleteDialogOpen(false)
+          setTransactionsToDelete([])
+        }}
+        onConfirm={() => {
+          if (transactionsToDelete.length > 0) {
+            // Call the onBulkDelete function with the transaction IDs
+            onBulkDelete?.(transactionsToDelete)
+            // Clear the selection
+            setRowSelection({})
+            // Close the dialog
+            setIsBulkDeleteDialogOpen(false)
+            setTransactionsToDelete([])
+          }
+        }}
+        title="Delete Selected Transactions"
+        description={`Are you sure you want to delete ${transactionsToDelete.length} selected transaction(s)? This action cannot be undone.`}
       />
 
       <BulkCategoryChangeDialog
@@ -474,6 +570,28 @@ export function TransactionsTable({
         onClose={() => setIsBulkCategoryDialogOpen(false)}
         onSave={handleBulkCategoryChange}
         selectedCount={Object.keys(rowSelection).length}
+      />
+
+      {/* Confirmation dialog for bulk deletion */}
+      <ConfirmationDialog
+        isOpen={isBulkDeleteDialogOpen}
+        onClose={() => {
+          setIsBulkDeleteDialogOpen(false)
+          setTransactionsToDelete([])
+        }}
+        onConfirm={() => {
+          if (transactionsToDelete.length > 0) {
+            // Call the onBulkDelete function with the transaction IDs
+            onBulkDelete?.(transactionsToDelete)
+            // Clear the selection
+            setRowSelection({})
+            // Close the dialog
+            setIsBulkDeleteDialogOpen(false)
+            setTransactionsToDelete([])
+          }
+        }}
+        title="Delete Selected Transactions"
+        description={`Are you sure you want to delete ${transactionsToDelete.length} selected transaction(s)? This action cannot be undone.`}
       />
     </div>
   )

@@ -38,7 +38,7 @@ import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
 import { transactionTypes } from "@/data/transactiontypes"
-import { frequencies } from "@/data/frequencies"
+import { frequencies, frequencyLabels, FrequencyType } from "@/data/frequencies"
 import { categories } from "@/data/categories"
 import { accountTypes } from "@/data/account-types"
 import { transactionService } from '@/app/services/transaction-services'
@@ -95,10 +95,10 @@ export function RecurringTransactionDialog({
       name: "",
       description: "",
       amount: 0,
-      type: "expense",
-      account_type: "cash",
+      type: "Expense", // Corrected case to match TransactionType
+      account_type: "Cash", // Corrected case to match AccountType
       category_id: "",
-      frequency: "monthly",
+      frequency: "Monthly" as FrequencyType, // Corrected case to match FrequencyType
       start_date: new Date(),
       ...initialData,
     },
@@ -115,14 +115,27 @@ export function RecurringTransactionDialog({
     setIsSubmitting(true)
 
     try {
+      // Format dates to ISO string format
+      const formatDate = (date: Date | undefined): string | undefined => {
+        return date ? date.toISOString() : undefined;
+      };
+
+      // Prepare the form data with proper types
       const submissionData = {
         ...data,
-        category_id: Number(data.category_id),
+        // Add the user_id from the authenticated user
+        user_id: user.id,
+        // Ensure category_id is properly parsed as a number
+        category_id: data.category_id ? parseInt(data.category_id) : 1,
+        // Convert Date objects to ISO strings
+        start_date: formatDate(data.start_date) as string,
+        end_date: formatDate(data.end_date),
         created_at: mode === 'create' ? new Date().toISOString() : undefined,
         updated_at: new Date().toISOString(),
       }
 
-      await transactionService.createRecurringTransaction(submissionData as unknown as RecurringTransaction, user.id)
+      // Pass the data to the transaction service
+      await transactionService.createRecurringTransaction(submissionData)
 
       toast.success(`${mode === 'create' ? 'Created' : 'Updated'} recurring transaction`, {
         description: "Your recurring transaction has been successfully saved.",
@@ -237,7 +250,7 @@ export function RecurringTransactionDialog({
                           </Button>
                         </FormControl>
                       </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
+                      <PopoverContent className="w-auto p-0 pointer-events-auto" align="start">
                         <Calendar
                           mode="single"
                           selected={field.value}
@@ -338,16 +351,19 @@ export function RecurringTransactionDialog({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Frequency</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                    >
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select frequency" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {frequencies.filter(f => f !== 'never').map((frequency) => (
-                          <SelectItem key={frequency} value={frequency}>
-                            {frequency.charAt(0).toUpperCase() + frequency.slice(1)}
+                        {frequencies.map((freq) => (
+                          <SelectItem key={freq} value={freq}>
+                            {frequencyLabels[freq]}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -381,7 +397,7 @@ export function RecurringTransactionDialog({
                         </Button>
                       </FormControl>
                     </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
+                    <PopoverContent className="w-auto p-0 pointer-events-auto" align="start">
                       <Calendar
                         mode="single"
                         selected={field.value}
