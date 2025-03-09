@@ -38,7 +38,7 @@ import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
 import { transactionTypes } from "@/data/transactiontypes"
-import { frequencies, frequencyLabels, FrequencyType } from "@/data/frequencies"
+import { frequencies, FrequencyType } from "@/data/frequencies"
 import { categories } from "@/data/categories"
 import { accountTypes } from "@/data/account-types"
 import { transactionService } from '@/app/services/transaction-services'
@@ -281,8 +281,8 @@ export function RecurringTransactionDialog({
                       </FormControl>
                       <SelectContent>
                         {transactionTypes.map((type) => (
-                          <SelectItem key={type} value={type}>
-                            {type.charAt(0).toUpperCase() + type.slice(1)}
+                          <SelectItem key={type.value} value={type.value}>
+                            {type.label}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -306,8 +306,8 @@ export function RecurringTransactionDialog({
                       </FormControl>
                       <SelectContent>
                         {accountTypes.map((type) => (
-                          <SelectItem key={type} value={type}>
-                            {type.charAt(0).toUpperCase() + type.slice(1)}
+                          <SelectItem key={type.value} value={type.value}>
+                            {type.label}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -362,8 +362,8 @@ export function RecurringTransactionDialog({
                       </FormControl>
                       <SelectContent>
                         {frequencies.map((freq) => (
-                          <SelectItem key={freq} value={freq}>
-                            {frequencyLabels[freq]}
+                          <SelectItem key={freq.value} value={freq.value}>
+                            {freq.label}
                           </SelectItem>
                         ))}
                       </SelectContent>

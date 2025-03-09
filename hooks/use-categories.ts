@@ -31,23 +31,42 @@ export function useCategories() {
           throw new Error('No active session found');
         }
 
-        // Convert user ID from string to number if needed for database compatibility
-        // This assumes your database expects a numeric user_id
-        const userId = parseInt(session.user.id, 10);
+        // Fetch categories for the user - try both string and number user_id
+        const userId = session.user.id;
         
-        // Fetch categories for the user
-        const { data, error } = await supabase
+        // Try to fetch with string user_id first
+        let { data, error } = await supabase
           .from('categories')
           .select('*')
-          .eq('user_id', userId)
+          .eq('user_id', userId as any)
           .order('name', { ascending: true });
+        
+        if (error) {
+          console.error('Error fetching categories with string ID:', error);
           
+          // Try with numeric user_id as fallback
+          const numericUserId = parseInt(userId, 10);
+          if (!isNaN(numericUserId)) {
+            const result = await supabase
+              .from('categories')
+              .select('*')
+              .eq('user_id', numericUserId as any)
+              .order('name', { ascending: true });
+            
+            data = result.data;
+            error = result.error;
+          }
+        }
+        
         if (error) throw error;
         
         setCategories(data || []);
       } catch (err) {
         console.error('Error fetching categories:', err);
         setError(err instanceof Error ? err : new Error('Failed to fetch categories'));
+        
+        // Set empty categories array on error to prevent UI issues
+        setCategories([]);
       } finally {
         setLoading(false);
       }

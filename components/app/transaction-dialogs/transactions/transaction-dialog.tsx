@@ -38,7 +38,7 @@ import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
 import { transactionTypes, TransactionType } from "@/data/transactiontypes"
-import { frequencies, frequencyLabels, FrequencyType } from "@/data/frequencies"
+import { frequencies, FrequencyType } from "@/data/frequencies"
 import { useCategories } from "@/hooks/use-categories"
 import { accountTypes, AccountType } from "@/data/account-types"
 import { transactionService } from '@/app/services/transaction-services'
@@ -206,8 +206,9 @@ export function TransactionDialog({
       }
       
       if (result.recurringTransaction) {
+        const frequencyObj = frequencies.find(f => f.value === data.recurring_frequency);
         toast.success('Created recurring transaction', {
-          description: `This transaction will repeat ${frequencyLabels[data.recurring_frequency as FrequencyType]}`
+          description: `This transaction will repeat ${frequencyObj ? frequencyObj.label : data.recurring_frequency}`
         })
       }
 
@@ -372,8 +373,8 @@ export function TransactionDialog({
                       </FormControl>
                       <SelectContent>
                         {transactionTypes.map((type) => (
-                          <SelectItem key={type} value={type}>
-                            {type.charAt(0).toUpperCase() + type.slice(1)}
+                          <SelectItem key={type.value} value={type.value}>
+                            {type.label}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -397,8 +398,8 @@ export function TransactionDialog({
                       </FormControl>
                       <SelectContent>
                         {accountTypes.map((type) => (
-                          <SelectItem key={type} value={type}>
-                            {type.charAt(0).toUpperCase() + type.slice(1)}
+                          <SelectItem key={type.value} value={type.value}>
+                            {type.label}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -451,8 +452,8 @@ export function TransactionDialog({
                       <SelectContent>
                         <SelectItem value="Never">One-time Transaction</SelectItem>
                         {frequencies.map((freq) => (
-                          <SelectItem key={freq} value={freq}>
-                            {frequencyLabels[freq]}
+                          <SelectItem key={freq.value} value={freq.value}>
+                            {freq.label}
                           </SelectItem>
                         ))}
                       </SelectContent>
