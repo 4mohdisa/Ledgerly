@@ -236,17 +236,51 @@ export function TransactionsTable({
                 Copy transaction ID
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => handleEditTransaction(transaction)}>
-                Edit transaction
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => {
-                if (transaction.id !== undefined) {
-                  setTransactionToDelete(transaction.id)
-                  setIsConfirmDialogOpen(true)
-                }
-              }}>
-                Delete transaction
-              </DropdownMenuItem>
+              {type === 'upcoming' && transaction.recurring_transaction_id ? (
+                // For upcoming transactions, show option to edit the parent recurring transaction
+                <DropdownMenuItem onClick={() => {
+                  // Notify the parent component that we want to edit the recurring transaction
+                  if (onEdit && transaction.recurring_transaction_id) {
+                    // Pass the recurring_transaction_id instead of the transaction id
+                    // The parent component will need to fetch the recurring transaction details
+                    onEdit(transaction.recurring_transaction_id, {
+                      ...transaction,
+                      id: transaction.recurring_transaction_id, // Use the recurring transaction ID
+                      // Add a flag to indicate this is an upcoming transaction edit
+                      isUpcomingEdit: true
+                    })
+                  }
+                }}>
+                  Edit recurring transaction
+                </DropdownMenuItem>
+              ) : (
+                // For regular transactions, show the normal edit option
+                <DropdownMenuItem onClick={() => handleEditTransaction(transaction)}>
+                  Edit transaction
+                </DropdownMenuItem>
+              )}
+              {type === 'upcoming' && transaction.recurring_transaction_id ? (
+                // For upcoming transactions, show option to delete the parent recurring transaction
+                <DropdownMenuItem onClick={() => {
+                  if (transaction.recurring_transaction_id !== undefined) {
+                    // Set the recurring transaction ID to delete instead
+                    setTransactionToDelete(transaction.recurring_transaction_id)
+                    setIsConfirmDialogOpen(true)
+                  }
+                }}>
+                  Delete recurring transaction
+                </DropdownMenuItem>
+              ) : (
+                // For regular transactions, show the normal delete option
+                <DropdownMenuItem onClick={() => {
+                  if (transaction.id !== undefined) {
+                    setTransactionToDelete(transaction.id)
+                    setIsConfirmDialogOpen(true)
+                  }
+                }}>
+                  Delete transaction
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         )
@@ -618,8 +652,10 @@ export function TransactionsTable({
             handleDeleteTransaction(transactionToDelete)
           }
         }}
-        title="Delete Transaction"
-        description="Are you sure you want to delete this transaction? This action cannot be undone."
+        title={type === 'upcoming' ? "Delete Recurring Transaction" : "Delete Transaction"}
+        description={type === 'upcoming' 
+          ? "Are you sure you want to delete this recurring transaction? This will remove all future occurrences. This action cannot be undone."
+          : "Are you sure you want to delete this transaction? This action cannot be undone."}
       />
 
       {/* Confirmation dialog for bulk deletion */}

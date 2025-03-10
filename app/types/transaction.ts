@@ -19,6 +19,9 @@ export interface Transaction {
   updated_at?: string | null;
   start_date?: Date | string;
   end_date?: Date | string | null;
+  // For upcoming transactions that are derived from recurring transactions
+  recurring_transaction_id?: number;
+  isUpcomingEdit?: boolean;
 }
 
 export interface RecurringTransaction {
