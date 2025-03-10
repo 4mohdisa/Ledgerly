@@ -43,10 +43,12 @@ import { transactions } from "@/data/transactions"
 import { categories } from "@/data/categories"
 import { ConfirmationDialog } from "../confirmation-dialog"
 import { TransactionDialog } from "../transaction-dialogs/transactions/transaction-dialog"
+import { RecurringTransactionDialog } from "../transaction-dialogs/recurring-transactions/recurring-transaction-dialog"
 import { DateRange } from "react-day-picker"
 import { BulkCategoryChangeDialog } from "../bulk-category-change"
 import { Transaction } from "@/app/types/transaction"
 import { TransactionFormValues } from "../transaction-dialogs/shared/schema"
+import { FrequencyType } from "@/data/frequencies"
 
 interface TransactionsTableProps {
   loading?: boolean
@@ -94,6 +96,7 @@ export function TransactionsTable({
   const [transactionToDelete, setTransactionToDelete] = React.useState<number | null>(null)
   const [isBulkCategoryDialogOpen, setIsBulkCategoryDialogOpen] = React.useState(false)
   const [isTransactionDialogOpen, setIsTransactionDialogOpen] = React.useState(false)
+  const [isRecurringTransactionDialogOpen, setIsRecurringTransactionDialogOpen] = React.useState(false)
   
   // For bulk deletion
   const [isBulkDeleteDialogOpen, setIsBulkDeleteDialogOpen] = React.useState(false)
@@ -197,6 +200,17 @@ export function TransactionsTable({
         return <div>{format(date, 'MM/dd/yyyy')}</div>
       },
     },
+    // End Date column - only visible for recurring transactions
+    ...(type === 'recurring' ? [{
+      accessorKey: "end_date",
+      header: "End Date",
+      cell: ({ row }: { row: any }) => {
+        const dateValue = row.getValue("end_date")
+        if (!dateValue || dateValue === '') return <div>No end date</div>
+        const date = new Date(dateValue as string)
+        return <div>{format(date, 'MM/dd/yyyy')}</div>
+      },
+    }] : []),
     {
       id: "actions",
       cell: ({ row }) => {
@@ -285,27 +299,60 @@ export function TransactionsTable({
   const handleEditTransaction = (transaction: Transaction) => {
     console.log('Edit transaction called with:', transaction)
     
-    // Only include fields that match TransactionFormValues schema
-    const formData: Partial<TransactionFormValues> = {
-      name: transaction.name,
-      amount: transaction.amount,
-      // Ensure date is properly converted to a Date object
-      date: transaction.date instanceof Date ? transaction.date : new Date(transaction.date),
-      type: transaction.type as TransactionFormValues['type'],
-      account_type: transaction.account_type as TransactionFormValues['account_type'],
-      // Convert category_id to string (required by the form)
-      category_id: transaction.category_id ? String(transaction.category_id) : '',
-      // Optional fields
-      description: transaction.description || '',
-      recurring_frequency: transaction.recurring_frequency as TransactionFormValues['recurring_frequency'] || 'Never',
-    }
-    
-    console.log('Prepared form data:', formData)
-    
-    // Set the editing transaction and form data
+    // Set the editing transaction
     setEditingTransaction(transaction)
-    setTransactionDialogData(formData)
-    setIsTransactionDialogOpen(true)
+    
+    // For recurring transactions, use the RecurringTransactionDialog
+    if (type === 'recurring') {
+      // Prepare data for recurring transaction form
+      const recurringFormData = {
+        name: transaction.name,
+        amount: transaction.amount,
+        type: transaction.type as TransactionFormValues['type'],
+        account_type: transaction.account_type as TransactionFormValues['account_type'],
+        category_id: transaction.category_id ? String(transaction.category_id) : '',
+        description: transaction.description || '',
+        // Use start_date instead of date for recurring transactions
+        start_date: transaction.start_date ? 
+          (transaction.start_date instanceof Date ? 
+            transaction.start_date : 
+            new Date(transaction.start_date as string)) : 
+          new Date(),
+        // Handle end_date which might be null
+        end_date: transaction.end_date ? 
+          (transaction.end_date instanceof Date ? 
+            transaction.end_date : 
+            new Date(transaction.end_date as string)) : 
+          undefined,
+        // Use recurring_frequency as frequency
+        frequency: transaction.recurring_frequency as FrequencyType || 'Monthly',
+      }
+      
+      console.log('Prepared recurring form data:', recurringFormData)
+      
+      setTransactionDialogData(recurringFormData)
+      setIsRecurringTransactionDialogOpen(true)
+    } else {
+      // Regular transaction form data
+      const formData: Partial<TransactionFormValues> = {
+        name: transaction.name,
+        amount: transaction.amount,
+        // Ensure date is properly converted to a Date object
+        date: transaction.date instanceof Date ? transaction.date : new Date(transaction.date),
+        type: transaction.type as TransactionFormValues['type'],
+        account_type: transaction.account_type as TransactionFormValues['account_type'],
+        // Convert category_id to string (required by the form)
+        category_id: transaction.category_id ? String(transaction.category_id) : '',
+        // Optional fields
+        description: transaction.description || '',
+        recurring_frequency: transaction.recurring_frequency as TransactionFormValues['recurring_frequency'] || 'Never',
+      }
+      
+      console.log('Prepared form data:', formData)
+      
+      setTransactionDialogData(formData)
+      setIsTransactionDialogOpen(true)
+    }
   }
 
   function handleBulkCategoryChange(categoryId: number): void {
@@ -519,6 +566,38 @@ export function TransactionsTable({
               onEdit?.(editingTransaction.id, transactionData)
             }
             setIsTransactionDialogOpen(false)
+            setEditingTransaction(null)
+            setTransactionDialogData({})
+          }
+        }}
+        initialData={transactionDialogData}
+        mode="edit"
+      />
+      
+      <RecurringTransactionDialog
+        isOpen={isRecurringTransactionDialogOpen}
+        onClose={() => {
+          setIsRecurringTransactionDialogOpen(false)
+          setEditingTransaction(null)
+          setTransactionDialogData({})
+        }}
+        onSubmit={(formData) => {
+          if (editingTransaction) {
+            // Convert form data to match Transaction type
+            const transactionData: Partial<Transaction> = {
+              ...formData,
+              // Map fields correctly for recurring transactions
+              start_date: formData.start_date instanceof Date ? formData.start_date.toISOString() : formData.start_date,
+              end_date: formData.end_date instanceof Date ? formData.end_date.toISOString() : formData.end_date,
+              recurring_frequency: formData.frequency,
+              // Ensure category_id is a number or undefined (not null)
+              category_id: formData.category_id ? Number(formData.category_id) : undefined
+            }
+            // Make sure editingTransaction.id is defined before calling onEdit
+            if (editingTransaction.id !== undefined) {
+              onEdit?.(editingTransaction.id, transactionData)
+            }
+            setIsRecurringTransactionDialogOpen(false)
             setEditingTransaction(null)
             setTransactionDialogData({})
           }

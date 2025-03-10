@@ -442,7 +442,7 @@ export function TransactionDialog({
                 name="recurring_frequency"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Schedule Type</FormLabel>
+                    <FormLabel>Frequency</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger>

@@ -3,7 +3,6 @@ export type FrequencyType = 'Never' | 'Daily' | 'Weekly' | 'Bi-Weekly' | 'Tri-We
 
 // Array of all frequencies for dropdown options
 export const frequencies: { value: FrequencyType; label: string }[] = [
-  { value: 'Never', label: 'One-time (not recurring)' },
   { value: 'Daily', label: 'Daily' },
   { value: 'Weekly', label: 'Weekly' },
   { value: 'Bi-Weekly', label: 'Bi-Weekly' },

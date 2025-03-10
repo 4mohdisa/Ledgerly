@@ -103,6 +103,25 @@ export function RecurringTransactionDialog({
       ...initialData,
     },
   })
+  
+  // Reset form with initialData when it changes or when dialog opens
+  useEffect(() => {
+    if (isOpen && initialData) {
+      console.log('Resetting form with initialData:', initialData)
+      // Reset the form with the initial values plus any new initialData
+      form.reset({
+        name: "",
+        description: "",
+        amount: 0,
+        type: "Expense",
+        account_type: "Cash",
+        category_id: "",
+        frequency: "Monthly" as FrequencyType,
+        start_date: new Date(),
+        ...initialData
+      })
+    }
+  }, [form, initialData, isOpen])
 
   const handleSubmit = async (data: RecurringTransactionFormValues) => {
     if (!user?.id) {
@@ -134,8 +153,14 @@ export function RecurringTransactionDialog({
         updated_at: new Date().toISOString(),
       }
 
-      // Pass the data to the transaction service
-      await transactionService.createRecurringTransaction(submissionData)
+      // Pass the data to the transaction service based on mode
+      if (mode === 'create') {
+        await transactionService.createRecurringTransaction(submissionData)
+      } else if (mode === 'edit') {
+        // For edit mode, we need to call the update function
+        // The onSubmit handler in the parent component will handle the actual API call
+        // We just need to pass the formatted data back
+      }
 
       toast.success(`${mode === 'create' ? 'Created' : 'Updated'} recurring transaction`, {
         description: "Your recurring transaction has been successfully saved.",

@@ -1,574 +1,345 @@
-"use client";
+"use client"
 
-import React, { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { toast } from "sonner";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { format } from "date-fns";
-import { CalendarIcon } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { useForm, Controller } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Transaction, TransactionFormData, FrequencyType } from "@/app/types/transaction";
-import { transactionService } from "@/app/services/transaction-services";
-import { createClient } from "@/utils/supabase/client";
-import { useCategories } from "@/hooks/use-categories";
-import { accountTypes } from "@/data/account-types";
-import { transactionTypes } from "@/data/transactiontypes";
-import { frequencies, recurringFrequencyData } from "@/data/frequencies";
+import React, { useState, useCallback, useEffect } from 'react'
+import { Button } from "@/components/ui/button"
+import { Plus, Menu } from 'lucide-react'
+import { toast } from "sonner"
 
-interface TransactionDialogProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSubmit: (data: TransactionFormData) => void;
-  transaction?: Transaction;
-  mode: "create" | "edit";
-}
-
-// Create a schema for form validation
-const transactionSchema = z.object({
-  name: z.string().min(1, { message: "Name is required" }),
-  amount: z.coerce.number().positive({ message: "Amount must be positive" }),
-  type: z.string(),
-  account_type: z.string(),
-  category_id: z.coerce.number(),
-  description: z.string().optional(),
-  date: z.date(),
-  schedule_type: z.string().default("Never"),
-  start_date: z.date().optional().nullable(),
-  end_date: z.date().optional().nullable(),
-});
-
-function TransactionDialog({ isOpen, onClose, onSubmit, transaction, mode = "create" }: TransactionDialogProps) {
-  const supabase = createClient();
-  const [loading, setLoading] = useState(false);
-  const [user, setUser] = useState<any>(null);
-  const { categories, loading: categoriesLoading } = useCategories();
-
-  // Initialize form with default values or transaction data for editing
-  const form = useForm<z.infer<typeof transactionSchema>>({
-    resolver: zodResolver(transactionSchema),
-    defaultValues: {
-      name: transaction?.name || "",
-      amount: transaction?.amount || 0,
-      type: transaction?.type || "Expense",
-      account_type: transaction?.account_type || "Cash",
-      category_id: transaction?.category_id || 1,
-      description: transaction?.description || "",
-      date: transaction?.date ? new Date(transaction.date) : new Date(),
-      schedule_type: transaction?.recurring_frequency || "Never",
-      start_date: transaction?.start_date ? new Date(transaction.start_date) : null,
-      end_date: transaction?.end_date ? new Date(transaction.end_date) : null,
-    },
-  });
-
-  // Get the current user
-  useEffect(() => {
-    const getCurrentUser = async () => {
-      const { data } = await supabase.auth.getUser();
-      setUser(data.user);
-    };
-
-    getCurrentUser();
-  }, [supabase.auth]);
-
-  const handleFormSubmit = async (data: z.infer<typeof transactionSchema>) => {
-    setLoading(true);
-    try {
-      // Transform the form data to match the TransactionFormData interface
-      const formData: TransactionFormData = {
-        name: data.name,
-        amount: data.amount,
-        type: data.type,
-        account_type: data.account_type,
-        category_id: data.category_id,
-        description: data.description || null,
-        date: data.date,
-        schedule_type: data.schedule_type as FrequencyType,
-        start_date: data.start_date,
-        end_date: data.end_date,
-      };
-
-      // Submit the form data
-      await onSubmit(formData);
-      form.reset();
-    } catch (error) {
-      console.error("Error submitting transaction:", error);
-      toast.error("Failed to save transaction");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{mode === "create" ? "Add New Transaction" : "Edit Transaction"}</DialogTitle>
-          <DialogDescription>
-            {mode === "create"
-              ? "Create a new transaction to track your finances."
-              : "Update the details of your transaction."}
-          </DialogDescription>
-        </DialogHeader>
-
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Transaction Name */}
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Transaction Name</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Groceries, Salary, etc." {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* Amount */}
-              <FormField
-                control={form.control}
-                name="amount"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Amount</FormLabel>
-                    <FormControl>
-                      <Input type="number" step="0.01" placeholder="0.00" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* Transaction Type */}
-              <FormField
-                control={form.control}
-                name="type"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Type</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select type" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {transactionTypes.map((type) => (
-                          <SelectItem key={type.value} value={type.value}>
-                            {type.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* Account Type */}
-              <FormField
-                control={form.control}
-                name="account_type"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Account</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select account" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {accountTypes.map((account) => (
-                          <SelectItem key={account.value} value={account.value}>
-                            {account.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* Category */}
-              <FormField
-                control={form.control}
-                name="category_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Category</FormLabel>
-                    <Select
-                      onValueChange={(value) => field.onChange(parseInt(value))}
-                      defaultValue={field.value?.toString()}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select category" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {categories.map((category) => (
-                          <SelectItem key={category.id} value={category.id.toString()}>
-                            {category.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* Transaction Date */}
-              <FormField
-                control={form.control}
-                name="date"
-                render={({ field }) => (
-                  <FormItem className="flex flex-col">
-                    <FormLabel>Date</FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant="outline"
-                            className={cn(
-                              "pl-3 text-left font-normal",
-                              !field.value && "text-muted-foreground"
-                            )}
-                          >
-                            {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
-                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={field.value}
-                          onSelect={field.onChange}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* Recurring Schedule */}
-              <FormField
-                control={form.control}
-                name="schedule_type"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Recurring Schedule</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select frequency" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {recurringFrequencyData.map((frequency) => (
-                          <SelectItem key={frequency.value} value={frequency.value}>
-                            {frequency.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* Conditional fields for recurring transactions */}
-              {form.watch("schedule_type") !== "Never" && (
-                <>
-                  {/* Start Date */}
-                  <FormField
-                    control={form.control}
-                    name="start_date"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-col">
-                        <FormLabel>Start Date</FormLabel>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <FormControl>
-                              <Button
-                                variant="outline"
-                                className={cn(
-                                  "pl-3 text-left font-normal",
-                                  !field.value && "text-muted-foreground"
-                                )}
-                              >
-                                {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
-                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                              </Button>
-                            </FormControl>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start">
-                            <Calendar
-                              mode="single"
-                              selected={field.value || undefined}
-                              onSelect={field.onChange}
-                              initialFocus
-                            />
-                          </PopoverContent>
-                        </Popover>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  {/* End Date */}
-                  <FormField
-                    control={form.control}
-                    name="end_date"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-col">
-                        <FormLabel>End Date (Optional)</FormLabel>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <FormControl>
-                              <Button
-                                variant="outline"
-                                className={cn(
-                                  "pl-3 text-left font-normal",
-                                  !field.value && "text-muted-foreground"
-                                )}
-                              >
-                                {field.value ? format(field.value, "PPP") : <span>No end date</span>}
-                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                              </Button>
-                            </FormControl>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start">
-                            <Calendar
-                              mode="single"
-                              selected={field.value || undefined}
-                              onSelect={field.onChange}
-                              initialFocus
-                            />
-                          </PopoverContent>
-                        </Popover>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </>
-              )}
-            </div>
-
-            {/* Description */}
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Description (Optional)</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Enter additional details about this transaction"
-                      className="resize-none"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={onClose}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={loading}>
-                {loading ? "Saving..." : mode === "create" ? "Add Transaction" : "Update Transaction"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
+import { DateRangePickerWithRange } from '@/components/app/date-range-picker'
+import { RecurringTransactionDialog } from '@/components/app/transaction-dialogs/recurring-transactions/recurring-transaction-dialog'
+import { TransactionsTable } from '@/components/app/tables/transactions-table'
+import { DateRange } from "react-day-picker"
+import { startOfMonth, endOfMonth } from "date-fns"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Transaction, FrequencyType, RecurringTransaction } from "@/app/types/transaction"
+import { upcomingTransactions } from "@/data/upcoming-transactions"
+import { PieDonutChart } from "@/components/app/charts/pie-donut-chart"
+import { TransactionChart } from "@/components/app/charts/bar-chart-interactive"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { createClient } from "@/utils/supabase/client"
+import { transactionService } from "@/app/services/transaction-services"
+  
 export default function RecurringTransactionsPage() {
-  const supabase = createClient();
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [transactions, setTransactions] = useState<any[]>([]);
-  const [selectedTransaction, setSelectedTransaction] = useState<any>(null);
-  const [dialogMode, setDialogMode] = useState<'create' | 'edit'>('create');
-  const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState<any>(null);
+  const [isAddTransactionOpen, setIsAddTransactionOpen] = useState(false)
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
+    from: startOfMonth(new Date()),
+    to: endOfMonth(new Date())
+  })
+  const [loading, setLoading] = useState(true)
+  // Define a type that extends RecurringTransaction to include the categories field from Supabase join
+  type RecurringTransactionWithCategories = RecurringTransaction & {
+    categories?: { name: string } | null
+  }
+  
+  const [recurringTransactions, setRecurringTransactions] = useState<RecurringTransactionWithCategories[]>([])
+  const [user, setUser] = useState<any>(null)
+  const supabase = createClient()
 
+  // Fetch user and recurring transactions
   useEffect(() => {
-    const getCurrentUser = async () => {
-      const { data } = await supabase.auth.getUser();
-      setUser(data.user);
-    };
-
-    getCurrentUser();
-  }, [supabase.auth]);
-
-  useEffect(() => {
-    if (user) {
-      fetchRecurringTransactions();
-    }
-  }, [user]);
-
-  const fetchRecurringTransactions = async () => {
-    setLoading(true);
-    try {
-      const transactions = await transactionService.getRecurringTransactions(user.id);
-      setTransactions(transactions);
-    } catch (error) {
-      console.error('Error fetching recurring transactions:', error);
-      toast.error('Failed to load recurring transactions');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleOpenDialog = (mode: 'create' | 'edit' = 'create', transaction?: any) => {
-    setDialogMode(mode);
-    setSelectedTransaction(transaction);
-    setIsDialogOpen(true);
-  };
-
-  const handleCloseDialog = () => {
-    setIsDialogOpen(false);
-    setSelectedTransaction(null);
-  };
-
-  const handleSubmit = async (data: TransactionFormData) => {
-    try {
-      if (dialogMode === 'create') {
-        // Format dates for API compatibility
-        const formattedData = {
-          ...data,
-          user_id: user.id,
-          frequency: data.schedule_type,
-          // start_date is required and can't be null
-          start_date: data.start_date ? format(data.start_date, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
-          // end_date is optional and can be null
-          end_date: data.end_date ? format(data.end_date, 'yyyy-MM-dd') : undefined,
-          date: format(data.date, 'yyyy-MM-dd')
-        };
+    const fetchUserAndTransactions = async () => {
+      try {
+        setLoading(true)
         
-        await transactionService.createRecurringTransaction(formattedData);
-        toast.success('Recurring transaction created');
-      } else {
-        // Format dates for API compatibility
-        const formattedData = {
-          ...data,
-          frequency: data.schedule_type,
-          start_date: data.start_date ? format(data.start_date, 'yyyy-MM-dd') : undefined,
-          end_date: data.end_date ? format(data.end_date, 'yyyy-MM-dd') : undefined
-        };
+        // Get current user
+        const { data: { user } } = await supabase.auth.getUser()
         
-        await transactionService.updateRecurringTransaction(
-          selectedTransaction.id,
-          formattedData,
-          user.id
-        );
-        toast.success('Recurring transaction updated');
+        if (!user) {
+          toast.error("Authentication required", {
+            description: "Please sign in to view recurring transactions.",
+          })
+          setLoading(false)
+          return
+        }
+        
+        setUser(user)
+        
+        // Fetch recurring transactions for the user
+        const transactions = await transactionService.getRecurringTransactions(user.id)
+        // Ensure all required fields are present and handle null values
+        const validTransactions = (transactions || []).map(t => ({
+          ...t,
+          user_id: t.user_id || user.id, // Use current user ID if null
+          category_id: t.category_id || 0 // Default to 0 if null
+        })) as RecurringTransactionWithCategories[]
+        
+        setRecurringTransactions(validTransactions)
+      } catch (error) {
+        console.error("Error fetching recurring transactions:", error)
+        toast.error("Failed to load recurring transactions", {
+          description: "Please try again later.",
+        })
+      } finally {
+        setLoading(false)
       }
-      fetchRecurringTransactions();
-      handleCloseDialog();
-    } catch (error) {
-      console.error('Error submitting transaction:', error);
-      toast.error('Failed to save recurring transaction');
     }
-  };
+    
+    fetchUserAndTransactions()
+  }, [])
 
-  const handleDeleteTransaction = async (id: number) => {
-    try {
-      await transactionService.deleteRecurringTransaction(id, user.id);
-      toast.success('Recurring transaction deleted');
-      fetchRecurringTransactions();
-    } catch (error) {
-      console.error('Error deleting transaction:', error);
-      toast.error('Failed to delete recurring transaction');
+  const handleAddTransaction = useCallback(() => {
+    setIsAddTransactionOpen(true)
+  }, [])
+
+  const handleDateRangeChange = useCallback((newDateRange: DateRange | undefined) => {
+    if (!newDateRange) {
+      // If date range is cleared, show all recurring transactions from the current month
+      setDateRange(undefined)
+      return
     }
-  };
+    
+    // Use the exact dates selected by the user
+    setDateRange({
+      from: newDateRange.from,
+      to: newDateRange.to || newDateRange.from
+    })
+  }, [])
+
+  const handleTransactionSubmit = useCallback(async (data: any) => {
+    try {
+      await transactionService.createRecurringTransaction(data)
+      toast.success("Recurring transaction created", {
+        description: "Your recurring transaction has been successfully created.",
+      })
+      
+      // Refresh the transactions list
+      if (user) {
+        const transactions = await transactionService.getRecurringTransactions(user.id)
+        // Ensure all required fields are present and handle null values
+        const validTransactions = (transactions || []).map(t => ({
+          ...t,
+          user_id: t.user_id || user.id, // Use current user ID if null
+          category_id: t.category_id || 0 // Default to 0 if null
+        })) as RecurringTransactionWithCategories[]
+        
+        setRecurringTransactions(validTransactions)
+      }
+    } catch (error) {
+      console.error("Error creating recurring transaction:", error)
+      toast.error("Failed to create recurring transaction", {
+        description: "Please try again later.",
+      })
+    } finally {
+      setIsAddTransactionOpen(false)
+    }
+  }, [user])
 
   return (
-    <div className="container mx-auto py-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Recurring Transactions</h1>
-        <Button onClick={() => handleOpenDialog('create')}>Add New</Button>
+    <div className="h-full flex flex-col">
+      <div className="container h-full flex flex-col mx-auto px-4 py-8">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+            <h1 className="text-3xl font-bold">Recurring Transactions</h1>
+            <div className="flex flex-col md:flex-row items-end md:items-center gap-4">
+              <DateRangePickerWithRange dateRange={dateRange} onDateRangeChange={handleDateRangeChange} />
+              <div className="flex gap-4 ml-auto">
+                <div className="md:hidden w-full">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="icon" className="w-full">
+                        <Menu className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onSelect={handleAddTransaction}>
+                        Add Recurring Transaction
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+                <div className="hidden md:flex gap-4">
+                  <Button onClick={handleAddTransaction}>
+                    <Plus className="mr-2 h-4 w-4" /> Add Recurring Transaction
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+          {/* Analytics Charts Section */}
+          <div className="mb-8">
+            <h2 className="text-xl font-semibold mb-4">Transaction Analytics</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Card className="border-none shadow-none bg-transparent">
+                <CardHeader>
+                  <CardTitle>Recurring by Category</CardTitle>
+                  <CardDescription>Distribution of recurring transactions</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <PieDonutChart />
+                </CardContent>
+              </Card>
+              <Card className="border-none shadow-none bg-transparent">
+                <CardHeader>
+                  <CardTitle>Upcoming Transactions</CardTitle>
+                  <CardDescription>Next 30 days transaction forecast</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <TransactionChart 
+                    transactions={upcomingTransactions.map(ut => ({
+                      id: typeof ut.id === 'string' ? parseInt(ut.id.replace('#UT', '')) : ut.id,
+                      user_id: String(ut.user_id),
+                      date: ut.date,
+                      amount: ut.amount,
+                      name: `Upcoming: ${ut.category_name}`,
+                      description: '',
+                      type: ut.type,
+                      account_type: 'Checking', // Default account type
+                      category_id: ut.category_id,
+                      category_name: ut.category_name
+                    })) || []}
+                    metrics={[
+                      { key: "income", label: "Income", color: "hsl(var(--chart-1))" },
+                      { key: "expense", label: "Expense", color: "hsl(var(--chart-2))" }
+                    ]}
+                    chartType="bar"
+                  />
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+          {/* Recurring Transactions Section */}
+          <div className="mb-8">
+            <h2 className="text-xl font-semibold mb-4">Active Recurring Transactions</h2>
+            <CardContent className="p-0">
+              <TransactionsTable
+                loading={loading}
+                data={recurringTransactions.map(rt => {
+                  // Extract category name from the joined categories data
+                  const categoryName = rt.categories?.name || ''
+                  
+                  return {
+                    id: rt.id,
+                    user_id: rt.user_id,
+                    date: rt.start_date, // Map start_date to date for filtering
+                    start_date: rt.start_date, // Include start_date for recurring transactions
+                    end_date: rt.end_date,
+                    amount: rt.amount,
+                    name: rt.name,
+                    description: rt.description,
+                    type: rt.type,
+                    account_type: rt.account_type,
+                    category_id: rt.category_id,
+                    category_name: categoryName,
+                    recurring_frequency: rt.frequency, // Use frequency from RecurringTransaction
+                    created_at: rt.created_at,
+                    updated_at: rt.updated_at
+                  }
+                }) as Transaction[]}
+                showFilters={true}
+                showPagination={true}
+                showRowsCount={true}
+                itemsPerPage={10}
+                sortBy={{
+                  field: "date",
+                  order: "desc"
+                }}
+                className="h-full"
+                dateRange={dateRange}
+                type="recurring"
+                onDelete={async (id) => {
+                  if (!user) return
+                  try {
+                    await transactionService.deleteRecurringTransaction(id, user.id)
+                    toast.success("Recurring transaction deleted")
+                    // Refresh the transactions list
+                    const transactions = await transactionService.getRecurringTransactions(user.id)
+                    // Ensure all required fields are present and handle null values
+                    const validTransactions = (transactions || []).map(t => ({
+                      ...t,
+                      user_id: t.user_id || user.id, // Use current user ID if null
+                      category_id: t.category_id || 0 // Default to 0 if null
+                    })) as RecurringTransactionWithCategories[]
+                    
+                    setRecurringTransactions(validTransactions)
+                  } catch (error) {
+                    console.error("Error deleting recurring transaction:", error)
+                    toast.error("Failed to delete recurring transaction")
+                  }
+                }}
+                onEdit={async (id, data) => {
+                  if (!user) return
+                  try {
+                    // Convert Transaction type to RecurringTransaction type
+                    const updateData: Partial<Omit<RecurringTransaction, 'id' | 'user_id'>> = {
+                      name: data.name,
+                      amount: data.amount,
+                      type: data.type,
+                      account_type: data.account_type,
+                      category_id: data.category_id,
+                      description: data.description,
+                      // Map date fields correctly
+                      start_date: data.start_date ? (typeof data.start_date === 'string' ? data.start_date : data.start_date.toISOString()) : undefined,
+                      end_date: data.end_date ? (typeof data.end_date === 'string' ? data.end_date : data.end_date.toISOString()) : null,
+                      frequency: data.recurring_frequency as FrequencyType || undefined
+                    }
+                    
+                    await transactionService.updateRecurringTransaction(id, updateData, user.id)
+                    toast.success("Recurring transaction updated")
+                    // Refresh the transactions list
+                    const transactions = await transactionService.getRecurringTransactions(user.id)
+                    // Ensure all required fields are present and handle null values
+                    const validTransactions = (transactions || []).map(t => ({
+                      ...t,
+                      user_id: t.user_id || user.id, // Use current user ID if null
+                      category_id: t.category_id || 0 // Default to 0 if null
+                    })) as RecurringTransactionWithCategories[]
+                    
+                    setRecurringTransactions(validTransactions)
+                  } catch (error) {
+                    console.error("Error updating recurring transaction:", error)
+                    toast.error("Failed to update recurring transaction")
+                  }
+                }}
+              />
+            </CardContent>
+          </div>
+
+          {/* Upcoming Transactions Section */}
+          <div>
+            <h2 className="text-xl font-semibold mb-4">Upcoming Transactions</h2>
+
+            <CardContent className="p-0">
+              <TransactionsTable
+                data={upcomingTransactions.map(transaction => ({
+                  id: typeof transaction.id === 'string' ? parseInt(transaction.id.replace('#UT', '')) : transaction.id,
+                  user_id: String(transaction.user_id),
+                  date: transaction.date,
+                  amount: transaction.amount,
+                  name: `${transaction.category_name} Payment`,
+                  description: '',
+                  type: transaction.type,
+                  account_type: 'Checking', // Default to Checking
+                  category_id: transaction.category_id,
+                  category_name: transaction.category_name,
+                  created_at: transaction.created_at,
+                  updated_at: transaction.updated_at
+                })) as Transaction[]}
+                showFilters={true}
+                showPagination={true}
+                showRowsCount={true}
+                itemsPerPage={10}
+                sortBy={{
+                  field: "date",
+                  order: "asc"
+                }}
+                className="h-full"
+                dateRange={dateRange}
+                type="upcoming"
+              />
+            </CardContent>
+          </div>
       </div>
 
-      {loading ? (
-        <div className="flex justify-center items-center h-64">
-          <p>Loading transactions...</p>
-        </div>
-      ) : transactions.length === 0 ? (
-        <div className="text-center py-10">
-          <p className="text-gray-500">No recurring transactions found</p>
-          <Button className="mt-4" onClick={() => handleOpenDialog('create')}>
-            Create Your First Recurring Transaction
-          </Button>
-        </div>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="bg-gray-100">
-                <th className="text-left p-3">Name</th>
-                <th className="text-left p-3">Amount</th>
-                <th className="text-left p-3">Type</th>
-                <th className="text-left p-3">Frequency</th>
-                <th className="text-left p-3">Category</th>
-                <th className="text-left p-3">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {transactions.map((transaction) => (
-                <tr key={transaction.id} className="border-b hover:bg-gray-50">
-                  <td className="p-3">{transaction.name}</td>
-                  <td className="p-3">${parseFloat(transaction.amount).toFixed(2)}</td>
-                  <td className="p-3">{transaction.type}</td>
-                  <td className="p-3">{transaction.recurring_frequency}</td>
-                  <td className="p-3">{transaction.categories?.name || 'Uncategorized'}</td>
-                  <td className="p-3 flex space-x-2">
-                    <Button variant="outline" size="sm" onClick={() => handleOpenDialog('edit', transaction)}>
-                      Edit
-                    </Button>
-                    <Button variant="destructive" size="sm" onClick={() => handleDeleteTransaction(transaction.id)}>
-                      Delete
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      <TransactionDialog
-        isOpen={isDialogOpen}
-        onClose={handleCloseDialog}
-        onSubmit={handleSubmit}
-        transaction={selectedTransaction}
-        mode={dialogMode}
+      <RecurringTransactionDialog
+        isOpen={isAddTransactionOpen}
+        onClose={() => setIsAddTransactionOpen(false)}
+        onSubmit={handleTransactionSubmit}
+        mode="create"
       />
     </div>
-  );
+  )
 }
