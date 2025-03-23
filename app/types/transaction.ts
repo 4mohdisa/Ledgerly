@@ -19,9 +19,6 @@ export interface Transaction {
   updated_at?: string | null;
   start_date?: Date | string;
   end_date?: Date | string | null;
-  // For upcoming transactions that are derived from recurring transactions
-  recurring_transaction_id?: number;
-  isUpcomingEdit?: boolean;
 }
 
 export interface RecurringTransaction {
@@ -41,8 +38,25 @@ export interface RecurringTransaction {
   updated_at?: string | null;
 }
 
+export interface UpcomingTransaction {
+  id: number;
+  recurring_transaction_id: number;
+  user_id: number;
+  category_id: number;
+  category_name: string;
+  date: string;
+  amount: number;
+  type?: string;
+  name?: string;
+  description?: string | null;
+  account_type?: string;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
 export type UpdateTransaction = Partial<Omit<Transaction, 'id' | 'user_id'>>;
 export type UpdateRecurringTransaction = Partial<Omit<RecurringTransaction, 'id' | 'user_id'>>;
+export type UpdateUpcomingTransaction = Partial<Omit<UpcomingTransaction, 'id' | 'user_id' | 'recurring_transaction_id'>>;
 
 export interface TransactionFormData {
   name: string;

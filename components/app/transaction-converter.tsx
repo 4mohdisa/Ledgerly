@@ -1,7 +1,9 @@
 "use client"
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { createClient } from '@/utils/supabase/client';
+import { transactionService } from '@/app/services/transaction-services';
+import { toast } from 'sonner';
 
 interface TransactionConverterProps {
   userId: string;
@@ -12,85 +14,38 @@ interface TransactionConverterProps {
  * to regular transactions when their due date arrives.
  */
 function TransactionConverter({ userId }: TransactionConverterProps) {
+  const [isProcessing, setIsProcessing] = useState(false);
+
   useEffect(() => {
-    const supabase = createClient();
-
-    // Set up real-time subscription to upcoming_transactions table
-    const channel = supabase
-      .channel('upcoming_transactions')
-      .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'upcoming_transactions' }, 
-        async (payload) => {
-          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-            const transaction = payload.new;
-            if (new Date(transaction.date) <= new Date()) {
-              await convertToTransaction(transaction);
-            }
-          }
-        }
-      )
-      .subscribe();
-
-    // Initial check for existing past-due transactions
-    checkAndConvertPastDue(userId);
-
-    // Cleanup subscription on component unmount
+    if (!userId) return;
+    
+    // Process transactions immediately when the component mounts
+    processTransactions();
+    
+    // Set up an interval to check for past-due transactions periodically
+    const interval = setInterval(() => {
+      processTransactions();
+    }, 60000); // Check every minute
+    
     return () => {
-      supabase.removeChannel(channel);
+      clearInterval(interval);
     };
   }, [userId]);
 
-  /**
-   * Converts an upcoming transaction to a regular transaction
-   */
-  async function convertToTransaction(upcomingTransaction: any) {
-    const supabase = createClient();
+  async function processTransactions() {
+    if (isProcessing || !userId) return;
     
-    // Insert the upcoming transaction into the regular transactions table
-    const { error: insertError } = await supabase.from('transactions').insert({
-      user_id: upcomingTransaction.user_id,
-      date: upcomingTransaction.date,
-      amount: upcomingTransaction.amount,
-      name: upcomingTransaction.name,
-      description: upcomingTransaction.description,
-      type: upcomingTransaction.type,
-      account_type: upcomingTransaction.account_type,
-      category_id: upcomingTransaction.category_id,
-      category_name: upcomingTransaction.category_name,
-      recurring_frequency: 'Never',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    });
-
-    // If the transaction was successfully inserted, delete it from upcoming_transactions
-    if (!insertError) {
-      await supabase.from('upcoming_transactions').delete().eq('id', upcomingTransaction.id);
-    } else {
-      console.error('Error converting transaction:', insertError);
-    }
-  }
-
-  /**
-   * Checks for and converts any past-due upcoming transactions
-   */
-  async function checkAndConvertPastDue(userId: string) {
-    const supabase = createClient();
-    
-    // Get all past-due upcoming transactions
-    const { data: pastDue, error } = await supabase
-      .from('upcoming_transactions')
-      .select('*')
-      .eq('user_id', Number(userId))
-      .lte('date', new Date().toISOString().split('T')[0]);
-
-    if (error) {
-      console.error('Error fetching past-due transactions:', error);
-      return;
-    }
-
-    // Convert each past-due transaction
-    for (const transaction of pastDue || []) {
-      await convertToTransaction(transaction);
+    try {
+      setIsProcessing(true);
+      await transactionService.convertPastDueTransactions(userId);
+      
+      // Only regenerate if we've processed past due transactions
+      await transactionService.generateUpcomingTransactions(userId);
+    } catch (error) {
+      console.error('Error processing transactions:', error);
+      toast.error('Failed to process due transactions');
+    } finally {
+      setIsProcessing(false);
     }
   }
 
