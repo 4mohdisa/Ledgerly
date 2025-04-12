@@ -126,6 +126,7 @@ export function NetBalanceChart() {
                     : "hsl(var(--destructive))";
                   return (
                     <circle
+                      key={`dot-${props.dataKey}-${props.index}`}
                       cx={props.cx}
                       cy={props.cy}
                       r={4}

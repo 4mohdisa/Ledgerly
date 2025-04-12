@@ -3,7 +3,9 @@ import { transactionTypes, TransactionType } from "@/data/transactiontypes"
 import { frequencies, FrequencyType } from "@/data/frequencies"
 import { accountTypes, AccountType } from "@/data/account-types"
 
-const frequencyEnum = z.enum(['never', ...frequencies] as [string, ...string[]])
+// Extract just the values from the frequency objects for the enum
+const frequencyValues = frequencies.map(f => f.value)
+const frequencyEnum = z.enum(['never', ...frequencyValues] as [string, ...string[]])
 
 export const baseSchema = {
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
@@ -11,8 +13,8 @@ export const baseSchema = {
     .number()
     .positive({ message: "Amount must be a positive number." })
     .max(100000000, { message: "Amount exceeds maximum limit of $100,000,000." }),
-  type: z.custom<TransactionType>((val) => transactionTypes.includes(val as any)),
-  account_type: z.custom<AccountType>((val) => accountTypes.includes(val as any)),
+  type: z.custom<TransactionType>((val) => transactionTypes.some(item => item.value === val)),
+  account_type: z.custom<AccountType>((val) => accountTypes.some(item => item.value === val)),
   category_id: z.string(),
   description: z.string().optional(),
   created_at: z.string().datetime({ offset: true }).optional(),
@@ -35,7 +37,7 @@ export const transactionSchema = z.object({
 export const recurringTransactionSchema = z.object({
   ...baseSchema,
   frequency: z.custom<FrequencyType>((val) => 
-    frequencies.includes(val as any) && val !== "Never"
+    frequencies.some(item => item.value === val) && val !== "Never"
   ),
   start_date: z.date({
     required_error: "Please select a start date",

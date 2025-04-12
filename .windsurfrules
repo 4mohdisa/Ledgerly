@@ -1,0 +1,31 @@
+Framework: Next.js version 14.1.0
+Frontend Library: React version 18.2.0
+Language: TypeScript version 5.7.2
+Styling: Tailwind CSS version 3.4.17
+Form Management: React Hook Form version 7.54.2 with Zod validation (v3.24.1)
+UI Component Libraries:
+
+Radix UI (various components v1.x-2.x)
+Lucide React icons version 0.469.0
+
+
+State Management: Redux Toolkit version 2.5.0 with React Redux 9.2.0
+Data Handling & Visualization:
+
+Recharts version 2.15.0
+TanStack React Table version 8.20.6
+
+
+Backend Integration: Supabase (auth-helpers, ssr, and client v0.x-2.x)
+AI/ML Integration:
+
+LlamaIndex version 0.8.30
+OpenAI API version 4.77.3
+
+
+Utilities:
+
+Date manipulation: date-fns version 3.6.0
+Math operations: mathjs version 14.0.1
+Data parsing: papaparse version 5.4.1 and xlsx version 0.18.5
+Utility libraries: lodash version 4.17.21

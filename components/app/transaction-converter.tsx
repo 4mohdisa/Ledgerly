@@ -10,8 +10,9 @@ interface TransactionConverterProps {
 }
 
 /**
- * A utility component that handles real-time conversion of upcoming transactions 
- * to regular transactions when their due date arrives.
+ * This component previously handled real-time conversion of upcoming transactions
+ * to regular transactions. Since upcoming transactions are now calculated on-demand
+ * and not stored in the database, this component is now a placeholder.
  */
 function TransactionConverter({ userId }: TransactionConverterProps) {
   const [isProcessing, setIsProcessing] = useState(false);
@@ -33,20 +34,12 @@ function TransactionConverter({ userId }: TransactionConverterProps) {
   }, [userId]);
 
   async function processTransactions() {
-    if (isProcessing || !userId) return;
+    // This function previously handled conversion of upcoming transactions
+    // Since upcoming transactions are now calculated on-demand,
+    // there's no need to process or convert them
     
-    try {
-      setIsProcessing(true);
-      await transactionService.convertPastDueTransactions(userId);
-      
-      // Only regenerate if we've processed past due transactions
-      await transactionService.generateUpcomingTransactions(userId);
-    } catch (error) {
-      console.error('Error processing transactions:', error);
-      toast.error('Failed to process due transactions');
-    } finally {
-      setIsProcessing(false);
-    }
+    // This function is kept as a placeholder for future functionality
+    return;
   }
 
   // This component doesn't render anything visible

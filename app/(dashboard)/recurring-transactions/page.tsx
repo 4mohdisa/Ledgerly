@@ -63,24 +63,24 @@ export default function RecurringTransactionsPage() {
     if (!user) return
     
     try {
-      console.log('Fetching upcoming transactions for user:', user.id);
+      console.log('Predicting upcoming transactions for user:', user.id);
       
       // First check if we have recurring transactions
       const recurringTxs = await transactionService.getRecurringTransactions(user.id);
       console.log('Recurring transactions found:', recurringTxs?.length || 0);
       
       if (!recurringTxs || recurringTxs.length === 0) {
-        console.log('No recurring transactions found, cannot generate upcoming transactions');
+        console.log('No recurring transactions found, cannot predict upcoming transactions');
         setUpcomingTransactions([]);
         return;
       }
       
-      // Force regeneration of upcoming transactions
-      const upcoming = await transactionService.generateUpcomingTransactions(user.id);
-      console.log('Generated upcoming transactions:', upcoming?.length || 0);    
+      // Predict upcoming transactions (2 per recurring transaction)
+      const upcoming = await transactionService.predictUpcomingTransactions(user.id, recurringTxs, 2);
+      console.log('Predicted upcoming transactions:', upcoming?.length || 0);    
       setUpcomingTransactions(upcoming || []);
     } catch (error) {
-      console.error("Error fetching upcoming transactions:", error)
+      console.error("Error predicting upcoming transactions:", error)
       toast.error("Failed to load upcoming transactions")
     }
   }, [user])
@@ -186,19 +186,19 @@ export default function RecurringTransactionsPage() {
 
         setRecurringTransactions(validTransactions)
 
-        // Fetch upcoming transactions based on recurring transactions
-        console.log('Initial load: Fetching upcoming transactions for user:', user.id);
+        // Predict upcoming transactions based on recurring transactions
+        console.log('Initial load: Predicting upcoming transactions for user:', user.id);
         
         // First check if we have recurring transactions
         if (validTransactions.length === 0) {
-          console.log('No recurring transactions found, cannot generate upcoming transactions');
+          console.log('No recurring transactions found, cannot predict upcoming transactions');
           setUpcomingTransactions([]);
         } else {
-          console.log('Found recurring transactions:', validTransactions.length, 'generating upcoming...');
+          console.log('Found recurring transactions:', validTransactions.length, 'predicting upcoming...');
           
-          // Force regeneration of upcoming transactions
-          const upcoming = await transactionService.generateUpcomingTransactions(user.id);
-          console.log('Generated upcoming transactions:', upcoming?.length || 0);
+          // Predict upcoming transactions (2 per recurring transaction)
+          const upcoming = await transactionService.predictUpcomingTransactions(user.id, validTransactions, 2);
+          console.log('Predicted upcoming transactions:', upcoming?.length || 0);
           
           setUpcomingTransactions(upcoming || []);
         }
@@ -248,8 +248,8 @@ export default function RecurringTransactionsPage() {
 
         setRecurringTransactions(validTransactions)
 
-        // Also refresh upcoming transactions
-        const upcoming = await transactionService.getUpcomingTransactions(user.id, 3)
+        // Also refresh predicted upcoming transactions
+        const upcoming = await transactionService.predictUpcomingTransactions(user.id, undefined, 2)
         setUpcomingTransactions(upcoming || [])
       }
     } catch (error) {
@@ -302,32 +302,39 @@ export default function RecurringTransactionsPage() {
               </CardContent>
             </Card>
             <Card className="border-none shadow-none bg-transparent">
-              <CardHeader>
-                <CardTitle>Upcoming Transactions</CardTitle>
-                <CardDescription>Next 30 days transaction forecast</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <TransactionChart
-                  transactions={upcomingTransactions.map(ut => ({
-                    id: typeof ut.id === 'string' ? parseInt(ut.id.replace('#UT', '')) : ut.id,
-                    user_id: String(ut.user_id),
-                    date: ut.date,
-                    amount: ut.amount,
-                    name: `Upcoming: ${ut.category_name}`,
-                    description: '',
-                    type: ut.type,
-                    account_type: 'Checking', // Default account type
-                    category_id: ut.category_id,
-                    category_name: ut.category_name
-                  })) || []}
-                  metrics={[
-                    { key: "income", label: "Income", color: "hsl(var(--chart-1))" },
-                    { key: "expense", label: "Expense", color: "hsl(var(--chart-2))" }
-                  ]}
-                  chartType="bar"
-                />
-              </CardContent>
-            </Card>
+                <CardHeader>
+                  <CardTitle>Upcoming Transactions</CardTitle>
+                  <CardDescription>Next 30 days transaction forecast</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <TransactionChart 
+                    transactions={upcomingTransactions.map(ut => {
+                      // Find the corresponding recurring transaction to get type
+                      const recurringTx = recurringTransactions.find(rt => 
+                        rt.id === ut.recurring_transaction_id
+                      );
+                      
+                      return {
+                        id: typeof ut.id === 'number' ? ut.id : parseInt(String(ut.id)),
+                        user_id: String(ut.user_id),
+                        date: ut.date,
+                        amount: ut.amount,
+                        name: `${ut.category_name || 'Payment'}`,
+                        description: '',
+                        type: recurringTx?.type || 'Expense', // Use parent transaction type if available
+                        account_type: recurringTx?.account_type || 'Checking',
+                        category_id: ut.category_id,
+                        category_name: ut.category_name
+                      };
+                    }) || []}
+                    metrics={[
+                      { key: "income", label: "Income", color: "hsl(var(--chart-1))" },
+                      { key: "expense", label: "Expense", color: "hsl(var(--chart-2))" }
+                    ]}
+                    chartType="bar"
+                  />
+                </CardContent>
+              </Card>
           </div>
         </div>
         {/* Recurring Transactions Section */}
@@ -338,7 +345,7 @@ export default function RecurringTransactionsPage() {
               loading={loading}
               data={recurringTransactions.map(rt => {
                 // Extract category name from the joined categories data
-                const categoryName = rt.categories?.name || ''
+                const categoryName = rt.categories?.name || '';
 
                 return {
                   id: rt.id,
@@ -377,43 +384,49 @@ export default function RecurringTransactionsPage() {
 
         {/* Upcoming Transactions Section */}
         <div>
-          <h2 className="text-xl font-semibold mb-4">Upcoming Transactions</h2>
+            <h2 className="text-xl font-semibold mb-4">Upcoming Transactions</h2>
 
-          <CardContent className="p-0">
-            <TransactionsTable
-              loading={loading}
-              data={upcomingTransactions.map(transaction => ({
-                id: typeof transaction.id === 'string' ? parseInt(transaction.id.replace('#UT', '')) : transaction.id,
-                user_id: String(transaction.user_id),
-                date: transaction.date,
-                amount: transaction.amount,
-                name: `${transaction.category_name} Payment`,
-                description: '',
-                type: transaction.type,
-                account_type: 'Checking', // Default to Checking
-                category_id: transaction.category_id,
-                category_name: transaction.category_name,
-                created_at: transaction.created_at,
-                updated_at: transaction.updated_at,
-                // Add the recurring_transaction_id to link back to the parent recurring transaction
-                recurring_transaction_id: transaction.recurring_transaction_id
-              })) as Transaction[]}
-              showFilters={true}
-              showPagination={true}
-              showRowsCount={true}
-              itemsPerPage={10}
-              sortBy={{
-                field: "date",
-                order: "asc"
-              }}
-              className="h-full"
-              dateRange={dateRange}
-              type="upcoming"
-              onDelete={handleDeleteRecurringTransaction}
-              onEdit={(id, data) => handleTableEdit(id, data)}
-            />
-          </CardContent>
-        </div>
+            <CardContent className="p-0">
+              <TransactionsTable
+                loading={loading}
+                data={upcomingTransactions.map(ut => {
+                  // Find the recurring transaction to get additional fields
+                  const recurringTx = recurringTransactions.find(rt => 
+                    rt.id === ut.recurring_transaction_id
+                  );
+                  
+                  return {
+                    id: ut.id,
+                    user_id: String(ut.user_id),
+                    date: ut.date,
+                    amount: ut.amount,
+                    name: recurringTx?.name || `${ut.category_name} Payment`,
+                    description: recurringTx?.description || '',
+                    type: recurringTx?.type || 'Expense',
+                    account_type: recurringTx?.account_type || 'Checking',
+                    category_id: ut.category_id,
+                    category_name: ut.category_name,
+                    created_at: ut.created_at,
+                    updated_at: ut.updated_at,
+                    recurring_transaction_id: ut.recurring_transaction_id
+                  };
+                }) as Transaction[]}
+                showFilters={true}
+                showPagination={true}
+                showRowsCount={true}
+                itemsPerPage={10}
+                sortBy={{
+                  field: "date",
+                  order: "asc"
+                }}
+                className="h-full"
+                dateRange={dateRange}
+                type="upcoming"
+                // Remove edit and delete functionality for upcoming transactions
+                // as they are now predicted and not stored in the database
+              />
+            </CardContent>
+          </div>
       </div>
 
       <RecurringTransactionDialog
