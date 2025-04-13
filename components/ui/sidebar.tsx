@@ -5,7 +5,7 @@ import { Slot } from "@radix-ui/react-slot"
 import { VariantProps, cva } from "class-variance-authority"
 import { PanelLeft } from "lucide-react"
 
-import { useIsMobile } from "@/hooks/use-mobile"
+// Implement a simple mobile detection hook inline
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -73,7 +73,23 @@ const SidebarProvider = React.forwardRef<
     },
     ref
   ) => {
-    const isMobile = useIsMobile()
+    // Simple mobile detection
+    const [isMobile, setIsMobile] = React.useState(false)
+    
+    React.useEffect(() => {
+      const checkIfMobile = () => {
+        setIsMobile(window.innerWidth < 768) // 768px is a common breakpoint for mobile
+      }
+      
+      // Check on mount
+      checkIfMobile()
+      
+      // Add event listener for window resize
+      window.addEventListener('resize', checkIfMobile)
+      
+      // Cleanup
+      return () => window.removeEventListener('resize', checkIfMobile)
+    }, [])
     const [openMobile, setOpenMobile] = React.useState(false)
 
     // This is the internal state of the sidebar.

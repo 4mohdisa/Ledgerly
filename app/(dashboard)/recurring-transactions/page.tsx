@@ -21,7 +21,6 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { createClient } from "@/utils/supabase/client"
 import { transactionService } from "@/app/services/transaction-services"
-import TransactionConverter from '@/components/app/transaction-converter'
 
 export default function RecurringTransactionsPage() {
   const [isAddTransactionOpen, setIsAddTransactionOpen] = useState(false)
@@ -468,7 +467,6 @@ export default function RecurringTransactionsPage() {
         initialData={editingRecurringTransaction}
         mode="edit"
       />
-      {user && <TransactionConverter userId={user.id} />}
     </div>
   )
 }

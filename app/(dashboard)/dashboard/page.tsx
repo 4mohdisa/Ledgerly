@@ -73,14 +73,25 @@ export default function DashboardPage() {
 
   const handleTransactionSubmit = async (data: any) => {
     try {
-      if (data.transactionType === "regular") {
-        await transactionService.createTransaction(data, "user_id_here")
-      } else {
-        await transactionService.createRecurringTransaction(data, "user_id_here")
+      if (!user) {
+        console.error("User not authenticated");
+        return;
       }
-      console.log("Transaction created successfully:", data)
+
+      if (data.transactionType === "regular") {
+        // Prepare the transaction data with user_id
+        const transactionData = {
+          ...data,
+          user_id: user.id
+        };
+        await transactionService.createTransaction(transactionData);
+      } else {
+        // Use the createCombinedTransaction method which takes userId as a separate parameter
+        await transactionService.createCombinedTransaction(data, user.id);
+      }
+      console.log("Transaction created successfully:", data);
     } catch (error) {
-      console.error("Failed to create transaction:", error)
+      console.error("Failed to create transaction:", error);
     }
   }
 
@@ -135,10 +146,16 @@ export default function DashboardPage() {
     }
 
     try {
+      // Format the date if it's a Date object
+      const formattedData = {
+        ...formData,
+        date: formData.date instanceof Date ? format(formData.date, 'yyyy-MM-dd') : formData.date
+      };
+      
       const supabase = createClient()
       const { error } = await supabase
         .from('transactions')
-        .update(formData)
+        .update(formattedData)
         .eq('id', id)
         .eq('user_id', user.id)
 
@@ -157,10 +174,16 @@ export default function DashboardPage() {
     }
 
     try {
+      // Format dates in the changes object if needed
+      const formattedChanges = {
+        ...changes,
+        date: changes.date instanceof Date ? format(changes.date, 'yyyy-MM-dd') : changes.date
+      };
+      
       const supabase = createClient()
       const { error } = await supabase
         .from('transactions')
-        .update(changes)
+        .update(formattedChanges)
         .in('id', ids)
         .eq('user_id', user.id)
 

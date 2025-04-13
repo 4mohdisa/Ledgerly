@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, Suspense } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
@@ -19,7 +19,8 @@ const formSchema = z.object({
   password: z.string().min(8, { message: "Password must be at least 8 characters" }),
 })
 
-export default function SignInPage() {
+// Component that uses useSearchParams must be wrapped in Suspense
+function SignInForm() {
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
@@ -27,7 +28,7 @@ export default function SignInPage() {
   const searchParams = useSearchParams()
   const redirectUrl = searchParams?.get('redirect') || '/'
   const supabase = createClient()
-
+  
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -228,5 +229,13 @@ export default function SignInPage() {
         </CardFooter>
       </Card>
     </div>
+  )
+}
+
+export default function SignInPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
+      <SignInForm />
+    </Suspense>
   )
 }

@@ -7,8 +7,7 @@ import {
   TransactionFormData,
   TransactionType,
   AccountType,
-  FrequencyType,
-  UpdateUpcomingTransaction 
+  FrequencyType
 } from '@/app/types/transaction';
 
 interface TransactionData extends Omit<Transaction, "id" | "date" | "end_date"> {
@@ -407,12 +406,6 @@ class TransactionService {
       throw error;
     }
   }
-
-  // For backward compatibility, keep the method name but use the new implementation
-  async getUpcomingTransactions(userId: string | number, count: number = 5) {
-    return this.predictUpcomingTransactions(userId, undefined, count);
-  }
-  
 
   /**
    * Helper function to calculate the next 'count' future dates based on frequency.
