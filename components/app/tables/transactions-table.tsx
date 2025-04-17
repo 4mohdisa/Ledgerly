@@ -109,19 +109,24 @@ export function TransactionsTable({
   const columns: ColumnDef<Transaction>[] = [
     {
       id: "select",
+      // Only show checkboxes for regular transactions, not for upcoming transactions
       header: ({ table }) => (
-        <Checkbox
-          checked={table.getIsAllPageRowsSelected() || (table.getIsSomePageRowsSelected() && "indeterminate")}
-          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-          aria-label="Select all"
-        />
+        type !== 'upcoming' ? (
+          <Checkbox
+            checked={table.getIsAllPageRowsSelected() || (table.getIsSomePageRowsSelected() && "indeterminate")}
+            onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+            aria-label="Select all"
+          />
+        ) : null
       ),
       cell: ({ row }) => (
-        <Checkbox
-          checked={row.getIsSelected()}
-          onCheckedChange={(value) => row.toggleSelected(!!value)}
-          aria-label="Select row"
-        />
+        type !== 'upcoming' ? (
+          <Checkbox
+            checked={row.getIsSelected()}
+            onCheckedChange={(value) => row.toggleSelected(!!value)}
+            aria-label="Select row"
+          />
+        ) : null
       ),
       enableSorting: false,
       enableHiding: false,
@@ -236,22 +241,15 @@ export function TransactionsTable({
                 Copy transaction ID
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              {type === 'upcoming' && transaction.recurring_transaction_id ? (
-                // For upcoming transactions, show option to edit the parent recurring transaction
-                <DropdownMenuItem onClick={() => {
-                  // Notify the parent component that we want to edit the recurring transaction
-                  if (onEdit && transaction.recurring_transaction_id) {
-                    // Pass the recurring_transaction_id instead of the transaction id
-                    // The parent component will need to fetch the recurring transaction details
-                    onEdit(transaction.recurring_transaction_id, {
-                      ...transaction,
-                      id: transaction.recurring_transaction_id, // Use the recurring transaction ID
-                      // Add a flag to indicate this is an upcoming transaction edit
-                      isUpcomingEdit: true
-                    })
-                  }
-                }}>
-                  Edit recurring transaction
+              {type === 'upcoming' && transaction.predicted ? (
+                // For predicted upcoming transactions, don't show edit or delete options
+                <DropdownMenuItem disabled className="text-muted-foreground">
+                  Predicted transaction (cannot be edited)
+                </DropdownMenuItem>
+              ) : type === 'upcoming' && transaction.recurring_transaction_id ? (
+                // For upcoming transactions, show informational message
+                <DropdownMenuItem disabled className="text-muted-foreground">
+                  Upcoming transaction (cannot be edited)
                 </DropdownMenuItem>
               ) : (
                 // For regular transactions, show the normal edit option
@@ -259,16 +257,10 @@ export function TransactionsTable({
                   Edit transaction
                 </DropdownMenuItem>
               )}
-              {type === 'upcoming' && transaction.recurring_transaction_id ? (
-                // For upcoming transactions, show option to delete the parent recurring transaction
-                <DropdownMenuItem onClick={() => {
-                  if (transaction.recurring_transaction_id !== undefined) {
-                    // Set the recurring transaction ID to delete instead
-                    setTransactionToDelete(transaction.recurring_transaction_id)
-                    setIsConfirmDialogOpen(true)
-                  }
-                }}>
-                  Delete recurring transaction
+              {type === 'upcoming' ? (
+                // For upcoming transactions, don't show delete option
+                <DropdownMenuItem disabled className="text-muted-foreground">
+                  Upcoming transactions cannot be deleted
                 </DropdownMenuItem>
               ) : (
                 // For regular transactions, show the normal delete option
@@ -456,48 +448,49 @@ export function TransactionsTable({
                   })}
               </DropdownMenuContent>
             </DropdownMenu>
-            <DropdownMenu>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline">
-                  Bulk Actions <ChevronDown className="ml-2 h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => {
-                  // Get the selected row indices
-                  const selectedRowIndices = Object.keys(rowSelection)
-                  
-                  if (selectedRowIndices.length === 0) {
-                    return // No rows selected
-                  }
-                  
-                  // Get the actual transaction IDs from the selected rows
-                  const selectedTransactionIds = selectedRowIndices
-                    .map(index => {
-                      const row = table.getRowModel().rows[Number(index)]
-                      const transaction = row?.original as Transaction
-                      return transaction?.id
-                    })
-                    .filter((id): id is number => id !== undefined)
-                  
-                  console.log('Selected transaction IDs for deletion:', selectedTransactionIds)
-                  
-                  if (selectedTransactionIds.length > 0) {
-                    // Store the IDs and open the confirmation dialog
-                    setTransactionsToDelete(selectedTransactionIds)
-                    setIsBulkDeleteDialogOpen(true)
-                  }
-                }}>
-                  Delete Selected
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => setIsBulkCategoryDialogOpen(true)}>
-                  Change Category
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            </DropdownMenu>
+            {/* Only show bulk actions for regular transactions, not for upcoming transactions */}
+            {type !== 'upcoming' && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline">
+                    Bulk Actions <ChevronDown className="ml-2 h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => {
+                    // Get the selected row indices
+                    const selectedRowIndices = Object.keys(rowSelection)
+                    
+                    if (selectedRowIndices.length === 0) {
+                      return // No rows selected
+                    }
+                    
+                    // Get the actual transaction IDs from the selected rows
+                    const selectedTransactionIds = selectedRowIndices
+                      .map(index => {
+                        const row = table.getRowModel().rows[Number(index)]
+                        const transaction = row?.original as Transaction
+                        return transaction?.id
+                      })
+                      .filter((id): id is number => id !== undefined)
+                    
+                    console.log('Selected transaction IDs for deletion:', selectedTransactionIds)
+                    
+                    if (selectedTransactionIds.length > 0) {
+                      // Store the IDs and open the confirmation dialog
+                      setTransactionsToDelete(selectedTransactionIds)
+                      setIsBulkDeleteDialogOpen(true)
+                    }
+                  }}>
+                    Delete Selected
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setIsBulkCategoryDialogOpen(true)}>
+                    Change Category
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
         </div>
       )}
