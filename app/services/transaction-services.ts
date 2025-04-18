@@ -338,6 +338,267 @@ class TransactionService {
   }
 
   /**
+   * Generates actual transactions from recurring transactions that are due (today or past)
+   * @param userId The user ID
+   * @param recurringTransactions Optional list of recurring transactions (if already fetched)
+   * @returns Array of newly created transactions
+   */
+  async generateDueTransactions(userId: string | number, recurringTransactions?: any[]) {
+    try {
+      console.log('Generating due transactions for user:', userId);
+
+      if (!userId) {
+        console.error('Cannot generate due transactions: userId is null or undefined');
+        return [];
+      }
+
+      // If recurring transactions weren't provided, fetch them
+      const transactions = recurringTransactions || await this.getRecurringTransactions(userId);
+      
+      if (!transactions || transactions.length === 0) {
+        console.log('No recurring transactions found for user:', userId);
+        return [];
+      }
+
+      console.log('Found recurring transactions:', transactions.length);
+      
+      // Get today's date (normalized to start of day)
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayStr = today.toISOString().split('T')[0];
+      
+      // Track newly created transactions
+      const createdTransactions = [];
+      
+      // Process each recurring transaction
+      for (const rt of transactions) {
+        const startDate = new Date(rt.start_date);
+        const endDate = rt.end_date ? new Date(rt.end_date) : undefined;
+        
+        // Skip if the start date is in the future
+        if (startDate > today) {
+          continue;
+        }
+        
+        // Skip if the end date is in the past
+        if (endDate && endDate < today) {
+          continue;
+        }
+        
+        // Calculate the next occurrence date that should have happened by today
+        const nextDate = this.getNextDueDate(startDate, rt.frequency, today);
+        
+        // If we found a date that should have occurred by today
+        if (nextDate && nextDate <= today) {
+          // Check if this transaction already exists in the database
+          const dateStr = nextDate.toISOString().split('T')[0];
+          
+          const { data: existingTransactions, error: checkError } = await this.supabase
+            .from('transactions')
+            .select('*')
+            .eq('user_id', userId.toString())
+            .eq('recurring_transaction_id', rt.id)
+            .eq('date', dateStr);
+            
+          if (checkError) {
+            console.error('Error checking for existing transaction:', checkError);
+            continue;
+          }
+          
+          // Only create the transaction if it doesn't already exist
+          if (!existingTransactions || existingTransactions.length === 0) {
+            // Create the actual transaction
+            const transactionData = {
+              user_id: userId.toString(),
+              recurring_transaction_id: rt.id,
+              name: rt.name,
+              amount: rt.amount,
+              date: dateStr,
+              description: rt.description,
+              type: rt.type,
+              account_type: rt.account_type,
+              category_id: rt.category_id,
+              recurring_frequency: rt.frequency,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            };
+            
+            const { data: newTransaction, error: insertError } = await this.supabase
+              .from('transactions')
+              .insert(transactionData)
+              .select()
+              .single();
+              
+            if (insertError) {
+              console.error('Error creating transaction from recurring transaction:', insertError);
+              continue;
+            }
+            
+            if (newTransaction) {
+              console.log(`Created transaction for recurring transaction ${rt.id} on date ${dateStr}`);
+              createdTransactions.push(newTransaction);
+            }
+          } else {
+            console.log(`Transaction for recurring transaction ${rt.id} on date ${dateStr} already exists`);
+          }
+        }
+      }
+      
+      return createdTransactions;
+    } catch (error) {
+      console.error('Error generating due transactions:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Helper function to find the most recent due date for a recurring transaction
+   * @param startDate The start date of the recurring transaction
+   * @param frequency The frequency type (Daily, Weekly, etc.)
+   * @param targetDate The target date (usually today) to compare against
+   * @returns The most recent due date that should have occurred by the target date
+   */
+  private getNextDueDate(startDate: Date, frequency: string, targetDate: Date): Date | null {
+    // Normalize dates to start of day
+    const start = new Date(startDate);
+    start.setHours(0, 0, 0, 0);
+    const target = new Date(targetDate);
+    target.setHours(0, 0, 0, 0);
+    
+    // If the start date is in the future, there's no due date yet
+    if (start > target) {
+      return null;
+    }
+    
+    // If the start date is today, that's the due date
+    if (start.getTime() === target.getTime()) {
+      return start;
+    }
+    
+    // Calculate the time difference in days
+    const diffTime = target.getTime() - start.getTime();
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    
+    let dueDate = new Date(start);
+    
+    // Calculate the next due date based on frequency
+    switch (frequency) {
+      case 'Daily':
+        // The due date is today
+        return target;
+        
+      case 'Weekly':
+        // Calculate how many weeks have passed
+        const weeks = Math.floor(diffDays / 7);
+        dueDate.setDate(start.getDate() + (weeks * 7));
+        break;
+        
+      case 'Bi-Weekly':
+        // Calculate how many 2-week periods have passed
+        const biWeeks = Math.floor(diffDays / 14);
+        dueDate.setDate(start.getDate() + (biWeeks * 14));
+        break;
+        
+      case 'Tri-Weekly':
+        // Calculate how many 3-week periods have passed
+        const triWeeks = Math.floor(diffDays / 21);
+        dueDate.setDate(start.getDate() + (triWeeks * 21));
+        break;
+        
+      case 'Monthly':
+        // Calculate how many months have passed
+        let months = 0;
+        dueDate = new Date(start);
+        while (true) {
+          dueDate.setMonth(start.getMonth() + months);
+          if (dueDate > target) {
+            dueDate.setMonth(start.getMonth() + months - 1);
+            break;
+          }
+          months++;
+        }
+        break;
+        
+      case 'Bi-Monthly':
+        // Calculate how many 2-month periods have passed
+        let biMonths = 0;
+        dueDate = new Date(start);
+        while (true) {
+          dueDate.setMonth(start.getMonth() + (biMonths * 2));
+          if (dueDate > target) {
+            dueDate.setMonth(start.getMonth() + (biMonths - 1) * 2);
+            break;
+          }
+          biMonths++;
+        }
+        break;
+        
+      case 'Quarterly':
+        // Calculate how many quarters have passed
+        let quarters = 0;
+        dueDate = new Date(start);
+        while (true) {
+          dueDate.setMonth(start.getMonth() + (quarters * 3));
+          if (dueDate > target) {
+            dueDate.setMonth(start.getMonth() + (quarters - 1) * 3);
+            break;
+          }
+          quarters++;
+        }
+        break;
+        
+      case 'Semi-Annually':
+        // Calculate how many half-years have passed
+        let halfYears = 0;
+        dueDate = new Date(start);
+        while (true) {
+          dueDate.setMonth(start.getMonth() + (halfYears * 6));
+          if (dueDate > target) {
+            dueDate.setMonth(start.getMonth() + (halfYears - 1) * 6);
+            break;
+          }
+          halfYears++;
+        }
+        break;
+        
+      case 'Annually':
+        // Calculate how many years have passed
+        let years = 0;
+        dueDate = new Date(start);
+        while (true) {
+          dueDate.setFullYear(start.getFullYear() + years);
+          if (dueDate > target) {
+            dueDate.setFullYear(start.getFullYear() + years - 1);
+            break;
+          }
+          years++;
+        }
+        break;
+        
+      default:
+        console.warn(`Unsupported frequency: ${frequency}, falling back to Monthly`);
+        // Fallback to monthly
+        let fallbackMonths = 0;
+        dueDate = new Date(start);
+        while (true) {
+          dueDate.setMonth(start.getMonth() + fallbackMonths);
+          if (dueDate > target) {
+            dueDate.setMonth(start.getMonth() + fallbackMonths - 1);
+            break;
+          }
+          fallbackMonths++;
+        }
+    }
+    
+    // If the calculated due date is in the future, it's not due yet
+    if (dueDate > target) {
+      return null;
+    }
+    
+    return dueDate;
+  }
+
+  /**
    * Predicts upcoming transactions based on recurring transactions without database integration
    * @param userId The user ID
    * @param recurringTransactions Optional list of recurring transactions (if already fetched)

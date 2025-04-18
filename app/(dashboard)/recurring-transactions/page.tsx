@@ -62,25 +62,36 @@ export default function RecurringTransactionsPage() {
     if (!user) return
     
     try {
-      console.log('Predicting upcoming transactions for user:', user.id);
+      console.log('Processing upcoming transactions for user:', user.id);
       
       // First check if we have recurring transactions
       const recurringTxs = await transactionService.getRecurringTransactions(user.id);
       console.log('Recurring transactions found:', recurringTxs?.length || 0);
       
       if (!recurringTxs || recurringTxs.length === 0) {
-        console.log('No recurring transactions found, cannot predict upcoming transactions');
+        console.log('No recurring transactions found, cannot process upcoming transactions');
         setUpcomingTransactions([]);
         return;
       }
       
-      // Predict upcoming transactions (2 per recurring transaction)
+      // Step 1: Generate any due transactions (convert recurring transactions that are due to actual transactions)
+      const generatedTransactions = await transactionService.generateDueTransactions(user.id, recurringTxs);
+      console.log('Generated due transactions:', generatedTransactions?.length || 0);
+      
+      // If we generated any transactions, refresh the regular transactions list
+      if (generatedTransactions && generatedTransactions.length > 0) {
+        // Notify the user about the newly created transactions
+        toast.success(`${generatedTransactions.length} transaction(s) generated from recurring schedules`);
+      }
+      
+      // Step 2: Predict upcoming transactions (2 per recurring transaction)
+      // This will only show future transactions since past ones have been converted to actual transactions
       const upcoming = await transactionService.predictUpcomingTransactions(user.id, recurringTxs, 2);
       console.log('Predicted upcoming transactions:', upcoming?.length || 0);    
       setUpcomingTransactions(upcoming || []);
     } catch (error) {
-      console.error("Error predicting upcoming transactions:", error)
-      toast.error("Failed to load upcoming transactions")
+      console.error("Error processing upcoming transactions:", error)
+      toast.error("Failed to process upcoming transactions")
     }
   }, [user])
 

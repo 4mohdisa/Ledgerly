@@ -11,7 +11,7 @@ import {
   SidebarMenu, 
   SidebarMenuItem, 
 } from "@/components/ui/sidebar";
-import { Home, List, Repeat, ChevronsUpDown, LogOut } from 'lucide-react';
+import { Home, List, Repeat, ChevronsUpDown, LogOut, UserCog } from 'lucide-react';
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { createClient } from '@/utils/supabase/client';
 import { User } from '@supabase/supabase-js';
 import { toast } from 'sonner';
+import { AccountManagementDialog } from './account-management-dialog';
 
 // Define navigation items
 const navItems = [
@@ -36,6 +37,7 @@ export function AppSidebar() {
   const router = useRouter();
   const supabase = createClient();
   const [user, setUser] = useState<User | null>(null);
+  const [isAccountDialogOpen, setIsAccountDialogOpen] = useState<boolean>(false);
 
   useEffect(() => {
     const getUser = async () => {
@@ -80,8 +82,9 @@ export function AppSidebar() {
   };
 
   return (
-    <Sidebar className="w-[15vw] bg-white border-r border-gray-200">
-      <SidebarContent className="flex flex-col h-full">
+    <>
+      <Sidebar className="w-[15vw] bg-white border-r border-gray-200">
+        <SidebarContent className="flex flex-col h-full">
         <div className="p-6 mb-8">
           <Image 
             src="/Ledgerly.svg" 
@@ -143,6 +146,10 @@ export function AppSidebar() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent className="w-56" align="end" side="right" sideOffset={8}>
+                <DropdownMenuItem onClick={() => setIsAccountDialogOpen(true)}>
+                  <UserCog className="mr-2 h-4 w-4" />
+                  <span>Manage Account</span>
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={handleSignOut} className="text-destructive">
                   <LogOut className="mr-2 h-4 w-4" />
                   <span>Sign Out</span>
@@ -151,7 +158,15 @@ export function AppSidebar() {
             </DropdownMenu>
           )}
         </div>
-      </SidebarContent>
-    </Sidebar>
+        </SidebarContent>
+      </Sidebar>
+      
+      {/* Account Management Dialog */}
+      <AccountManagementDialog 
+        isOpen={isAccountDialogOpen} 
+        onClose={() => setIsAccountDialogOpen(false)} 
+        user={user} 
+      />
+    </>
   );
 }

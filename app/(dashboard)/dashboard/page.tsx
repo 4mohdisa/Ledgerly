@@ -42,7 +42,8 @@ export default function DashboardPage() {
   const [isEditingBalance, setIsEditingBalance] = useState(false)
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
   const [dateRange, setDateRange] = useState<DateRange | undefined>(defaultDateRange)
-  const { transactions: transactionsList, loading: isLoading, error } = useTransactions(dateRange)
+  const { transactions: transactionsList, loading: isLoading, error, refresh: refreshTransactions } = useTransactions(dateRange)
+  const [processingDueTransactions, setProcessingDueTransactions] = useState(false)
 
   const handleAddTransaction = useCallback(() => {
     setIsAddTransactionOpen(true)
@@ -64,6 +65,38 @@ export default function DashboardPage() {
       console.log(`Date range changed: ${format(from, 'yyyy-MM-dd')} to ${format(to, 'yyyy-MM-dd')}`)
     }
   }, [])
+
+  // Process any due recurring transactions and convert them to actual transactions
+  useEffect(() => {
+    const generateDueTransactions = async () => {
+      if (!user) return;
+      
+      try {
+        setProcessingDueTransactions(true);
+        console.log('Checking for due recurring transactions...');
+        
+        // Generate transactions from any due recurring transactions
+        const generatedTransactions = await transactionService.generateDueTransactions(user.id);
+        
+        if (generatedTransactions && generatedTransactions.length > 0) {
+          console.log(`Generated ${generatedTransactions.length} transactions from recurring schedules`);
+          toast.success(`${generatedTransactions.length} transaction(s) generated from recurring schedules`);
+          
+          // Refresh the transactions list to include the newly created transactions
+          refreshTransactions();
+        } else {
+          console.log('No due transactions to generate');
+        }
+      } catch (error) {
+        console.error('Error generating due transactions:', error);
+        toast.error('Failed to process recurring transactions');
+      } finally {
+        setProcessingDueTransactions(false);
+      }
+    };
+    
+    generateDueTransactions();
+  }, [user, refreshTransactions]);
 
   const handleDateChange = useCallback((date: Date) => {
     setSelectedDate(date)
