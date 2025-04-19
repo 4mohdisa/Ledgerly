@@ -30,7 +30,7 @@ export function useTransactions(dateRange?: DateRange) {
       if (!user?.id) return
 
       try {
-        console.log('Fetching transactions with date range:', dateRange)
+
         let query = supabase
           .from('transactions')
           .select(`
@@ -55,7 +55,7 @@ export function useTransactions(dateRange?: DateRange) {
           throw error
         }
 
-        console.log('Fetched transactions:', data)
+
         setTransactions((data || []) as Transaction[])
       } catch (err) {
         console.error('Error fetching transactions:', err)
@@ -78,18 +78,18 @@ export function useTransactions(dateRange?: DateRange) {
           table: 'transactions',
           filter: `user_id=eq.${user.id}` // Only listen for changes to this user's transactions
         }, () => {
-          console.log('Transaction change detected, refreshing...')
+
           refresh() // Refresh the transactions list when a change is detected
         })
         .subscribe()
 
-      console.log('Real-time subscription to transactions table established')
+
     }
 
     // Clean up subscription when component unmounts or dependencies change
     return () => {
       if (subscription) {
-        console.log('Unsubscribing from real-time updates')
+
         supabase.removeChannel(subscription)
       }
     }

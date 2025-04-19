@@ -37,10 +37,13 @@ import {
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
-import { transactionTypes } from "@/data/transactiontypes"
+import { transactionTypes, TransactionType } from "@/data/transactiontypes"
 import { frequencies, FrequencyType } from "@/data/frequencies"
-import { categories } from "@/data/categories"
-import { accountTypes } from "@/data/account-types"
+import { accountTypes, AccountType } from "@/data/account-types"
+
+// Redux imports
+import { useAppDispatch, useAppSelector } from '@/redux/hooks'
+import { fetchCategories } from '@/redux/slices/categoriesSlice'
 import { transactionService } from '@/app/services/transaction-services'
 import { RecurringTransaction, UpdateRecurringTransaction } from '@/app/types/transaction'
 import { BaseDialogProps, RecurringTransactionFormValues, recurringTransactionSchema } from '../shared/schema'
@@ -59,10 +62,12 @@ function useUser() {
     const getUser = async () => {
       const { data: { session }, error } = await supabase.auth.getSession()
       if (error) {
-        console.error('Error fetching user:', error)
+        console.error('Error getting session:', error)
         return
       }
-      setUser(session?.user ?? null)
+      if (session) {
+        setUser(session.user)
+      }
     }
 
     getUser()
@@ -74,7 +79,7 @@ function useUser() {
     return () => {
       subscription.unsubscribe()
     }
-  }, [supabase.auth])
+  }, [])
 
   return { user }
 }
@@ -87,6 +92,19 @@ export function RecurringTransactionDialog({
   mode,
 }: RecurringTransactionDialogProps) {
   const { user } = useUser()
+  
+  // Use Redux state for categories
+  const dispatch = useAppDispatch()
+  const { items: categories, status: categoriesStatus } = useAppSelector((state: any) => state.categories)
+  const categoriesLoading = categoriesStatus === 'loading' || categoriesStatus === 'idle'
+  
+  // Fetch categories when component mounts if they're not already loaded
+  useEffect(() => {
+    if (user && categories.length === 0 && categoriesStatus !== 'loading') {
+      dispatch(fetchCategories(user.id))
+    }
+  }, [user, categories.length, categoriesStatus, dispatch])
+  
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const form = useForm<RecurringTransactionFormValues>({
@@ -107,7 +125,7 @@ export function RecurringTransactionDialog({
   // Reset form with initialData when it changes or when dialog opens
   useEffect(() => {
     if (isOpen && initialData) {
-      console.log('Resetting form with initialData:', initialData)
+
       // Reset the form with the initial values plus any new initialData
       form.reset({
         name: "",
@@ -358,11 +376,15 @@ export function RecurringTransactionDialog({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {categories.map((category) => (
-                          <SelectItem key={category.id} value={String(category.id)}>
-                            {category.name}
-                          </SelectItem>
-                        ))}
+                        {categories?.length > 0 ? (
+                          categories.map((category: { id: number; name: string }) => (
+                            <SelectItem key={category.id} value={category.id.toString()}>
+                              {category.name}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="1">Uncategorized</SelectItem>
+                        )}
                       </SelectContent>
                     </Select>
                     <FormMessage />

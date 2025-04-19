@@ -7,36 +7,28 @@ export async function GET(request: NextRequest) {
   const code = requestUrl.searchParams.get('code')
   const redirectUrl = requestUrl.searchParams.get('redirectUrl') || '/'
   
-  console.log('Auth callback received:', {
-    code: code ? 'exists' : 'missing',
-    redirectUrl
-  })
+  // Process auth callback with code and redirectUrl
   
   if (code) {
     try {
       const cookieStore = cookies()
       const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
       
-      console.log('Exchanging code for session...')
+
       
       // Exchange the code for a session
       const { data: { session }, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
       
       if (exchangeError) {
-        console.error('Error exchanging code:', exchangeError)
         throw exchangeError
       }
       
-      console.log('Session established:', {
-        user: session?.user?.id,
-        expiresAt: session?.expires_at
-      })
+      // Session established successfully
       
       // Get the user from the newly created session
       const { data: { user }, error: userError } = await supabase.auth.getUser()
       
       if (userError) {
-        console.error('Error getting user:', userError)
         throw userError
       }
     

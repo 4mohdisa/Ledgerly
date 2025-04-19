@@ -1,5 +1,6 @@
 import "./globals.css";
 import { AuthProvider } from '@/context/auth-context'
+import { ReduxProvider } from '@/redux/provider';
 import localFont from "next/font/local";
 
 const geistSans = localFont({
@@ -24,7 +25,9 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <AuthProvider>
-          {children}
+          <ReduxProvider>
+            {children}
+          </ReduxProvider>
         </AuthProvider>
       </body>
     </html>

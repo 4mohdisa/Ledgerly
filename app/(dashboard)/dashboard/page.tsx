@@ -1,16 +1,36 @@
 'use client'
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import React, { useState, useEffect, useCallback, useMemo, Suspense } from 'react'
 import { Button } from "@/components/ui/button"
 import { Upload, Plus, Menu } from 'lucide-react'
 import { MetricsCards } from "@/components/app/metrics-cards"
-import { SpendingChart } from "@/components/app/charts/bar-chart-multiple"
-import { PieDonutChart } from "@/components/app/charts/pie-donut-chart"
 import { TransactionsTable } from "@/components/app/tables/transactions-table"
-import { TransactionChart } from "@/components/app/charts/bar-chart-interactive"
-import { NetBalanceChart } from "@/components/app/charts/line-chart"
+import { Skeleton } from "@/components/ui/skeleton"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+
+// Dynamic imports for heavy chart components
+const SpendingChart = React.lazy(() => import("@/components/app/charts/bar-chart-multiple"))
+const PieDonutChart = React.lazy(() => import("@/components/app/charts/pie-donut-chart"))
+const TransactionChart = React.lazy(() => import("@/components/app/charts/bar-chart-interactive"))
+const NetBalanceChart = React.lazy(() => import("@/components/app/charts/line-chart"))
+
 import { DateRange } from "react-day-picker"
 import { startOfMonth, endOfMonth, format, isFirstDayOfMonth } from "date-fns"
+
+// Chart wrapper component to handle lazy loading with error boundary
+function ChartWrapper({ children }: { children: React.ReactNode }) {
+  return (
+    <React.Suspense fallback={<div className="h-[300px] flex items-center justify-center"><p className="text-muted-foreground">Loading chart...</p></div>}>
+      {children}
+    </React.Suspense>
+  )
+}
 import { useAuth } from '@/context/auth-context'
 import { toast } from 'sonner'
 import { createClient } from '@/utils/supabase/client'
@@ -62,7 +82,7 @@ export default function DashboardPage() {
       const from = startOfMonth(newDateRange.from)
       const to = endOfMonth(newDateRange.from)
       setDateRange({ from, to })
-      console.log(`Date range changed: ${format(from, 'yyyy-MM-dd')} to ${format(to, 'yyyy-MM-dd')}`)
+
     }
   }, [])
 
@@ -73,19 +93,19 @@ export default function DashboardPage() {
       
       try {
         setProcessingDueTransactions(true);
-        console.log('Checking for due recurring transactions...');
+
         
         // Generate transactions from any due recurring transactions
         const generatedTransactions = await transactionService.generateDueTransactions(user.id);
         
         if (generatedTransactions && generatedTransactions.length > 0) {
-          console.log(`Generated ${generatedTransactions.length} transactions from recurring schedules`);
+
           toast.success(`${generatedTransactions.length} transaction(s) generated from recurring schedules`);
           
           // Refresh the transactions list to include the newly created transactions
           refreshTransactions();
         } else {
-          console.log('No due transactions to generate');
+
         }
       } catch (error) {
         console.error('Error generating due transactions:', error);
@@ -122,7 +142,7 @@ export default function DashboardPage() {
         // Use the createCombinedTransaction method which takes userId as a separate parameter
         await transactionService.createCombinedTransaction(data, user.id);
       }
-      console.log("Transaction created successfully:", data);
+
     } catch (error) {
       console.error("Failed to create transaction:", error);
     }
@@ -284,19 +304,43 @@ export default function DashboardPage() {
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-3">
-              <TransactionChart />
+              <Card className="border-none shadow-none bg-transparent">
+                <CardContent>
+                  <ChartWrapper>
+                    <TransactionChart />
+                  </ChartWrapper>
+                </CardContent>
+              </Card>
             </div>
 
             <div className="lg:col-span-1">
-              <NetBalanceChart />
+              <Card className="border-none shadow-none bg-transparent">
+                <CardContent>
+                  <ChartWrapper>
+                    <NetBalanceChart />
+                  </ChartWrapper>
+                </CardContent>
+              </Card>
             </div>
 
             <div>
-              <SpendingChart />
+              <Card className="border-none shadow-none bg-transparent">
+                <CardContent>
+                  <ChartWrapper>
+                    <SpendingChart />
+                  </ChartWrapper>
+                </CardContent>
+              </Card>
             </div>
 
             <div>
-              <PieDonutChart />
+              <Card className="border-none shadow-none bg-transparent">
+                <CardContent>
+                  <ChartWrapper>
+                    <PieDonutChart />
+                  </ChartWrapper>
+                </CardContent>
+              </Card>
             </div>
           </div>
 

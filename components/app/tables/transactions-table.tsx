@@ -79,6 +79,7 @@ export function TransactionsTable({
   className,
   dateRange,
   data,
+  loading = false,
   onDelete,
   onBulkDelete,
   onEdit,
@@ -323,7 +324,7 @@ export function TransactionsTable({
   }
 
   const handleEditTransaction = (transaction: Transaction) => {
-    console.log('Edit transaction called with:', transaction)
+
     
     // Set the editing transaction
     setEditingTransaction(transaction)
@@ -354,7 +355,7 @@ export function TransactionsTable({
         frequency: transaction.recurring_frequency as FrequencyType || 'Monthly',
       }
       
-      console.log('Prepared recurring form data:', recurringFormData)
+
       
       setTransactionDialogData(recurringFormData)
       setIsRecurringTransactionDialogOpen(true)
@@ -374,7 +375,7 @@ export function TransactionsTable({
         recurring_frequency: transaction.recurring_frequency as TransactionFormValues['recurring_frequency'] || 'Never',
       }
       
-      console.log('Prepared form data:', formData)
+
       
       setTransactionDialogData(formData)
       setIsTransactionDialogOpen(true)
@@ -398,8 +399,8 @@ export function TransactionsTable({
       })
       .filter((id): id is number => id !== undefined)
     
-    console.log('Selected transaction IDs for category change:', selectedTransactionIds)
-    console.log('New category ID:', categoryId)
+
+
     
     if (selectedTransactionIds.length > 0) {
       // Call the onBulkEdit function with the transaction IDs and the new category ID
@@ -474,7 +475,7 @@ export function TransactionsTable({
                       })
                       .filter((id): id is number => id !== undefined)
                     
-                    console.log('Selected transaction IDs for deletion:', selectedTransactionIds)
+
                     
                     if (selectedTransactionIds.length > 0) {
                       // Store the IDs and open the confirmation dialog
@@ -516,7 +517,20 @@ export function TransactionsTable({
             ))}
           </TableHeader>
           <TableBody>
-            {table.getRowModel().rows?.length ? (
+            {loading ? (
+              // Display skeleton rows when loading
+              Array.from({ length: 5 }).map((_, index) => (
+                <TableRow key={`loading-${index}`}>
+                  {Array.from({ length: columns.length }).map((_, cellIndex) => (
+                    <TableCell key={`loading-cell-${index}-${cellIndex}`}>
+                      <div className="flex items-center space-x-2">
+                        <div className="h-4 w-full bg-muted rounded animate-pulse"></div>
+                      </div>
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
                 <TableRow
                   key={row.id}
@@ -542,19 +556,24 @@ export function TransactionsTable({
 
       {(showPagination || showRowsCount) && (
         <div className="flex items-center justify-end space-x-2 py-4">
-          {showRowsCount && (
+          {showRowsCount && !loading && (
             <div className="flex-1 text-sm text-muted-foreground">
               {table.getFilteredSelectedRowModel().rows.length} of{" "}
               {table.getFilteredRowModel().rows.length} row(s) selected.
             </div>
           )}
+          {showRowsCount && loading && (
+            <div className="flex-1 text-sm text-muted-foreground">
+              <div className="h-4 w-24 bg-muted rounded animate-pulse"></div>
+            </div>
+          )}
           {showPagination && (
-            <div className="space-x-2">
+            <div className="flex items-center space-x-2">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => table.previousPage()}
-                disabled={!table.getCanPreviousPage()}
+                disabled={loading || !table.getCanPreviousPage()}
               >
                 Previous
               </Button>
@@ -562,7 +581,7 @@ export function TransactionsTable({
                 variant="outline"
                 size="sm"
                 onClick={() => table.nextPage()}
-                disabled={!table.getCanNextPage()}
+                disabled={loading || !table.getCanNextPage()}
               >
                 Next
               </Button>

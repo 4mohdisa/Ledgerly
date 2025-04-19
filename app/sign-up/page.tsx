@@ -69,23 +69,10 @@ export default function SignUpPage() {
         return
       }
 
-      console.log('Sign-up response:', {
-        user: {
-          id: data.user.id,
-          email: data.user.email,
-          emailConfirmed: data.user.email_confirmed_at,
-          createdAt: data.user.created_at
-        },
-        session: data.session ? 'exists' : 'none'
-      });
+      // Process user data after successful sign-up
       
       // Log the user data for debugging
-      console.log('User created:', {
-        id: data.user.id,
-        email: data.user.email,
-        emailConfirmed: data.user.email_confirmed_at,
-        createdAt: data.user.created_at
-      });
+      // User created successfully
 
       // Create profile in the profiles table
       const { error: profileError } = await supabase
@@ -103,7 +90,7 @@ export default function SignUpPage() {
         console.error('Error creating profile:', profileError)
         // Continue with sign-up process even if profile creation fails
       } else {
-        console.log("Profile created successfully");
+
       }
 
       // If email confirmation is required

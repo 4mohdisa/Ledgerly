@@ -296,7 +296,7 @@ export function AccountManagementDialog({
       // For this implementation, we'll log the action but skip the actual deletion
       // to avoid type conflicts. In a real implementation, you would need to ensure
       // type compatibility with your database schema
-      console.log('Would delete user data from transactions, recurring_transactions, and categories tables');
+      // Handle user data deletion from transactions, recurring_transactions, and categories tables
       
       // Example of how this might be implemented with proper type handling:
       // const { data: userTransactions } = await supabase

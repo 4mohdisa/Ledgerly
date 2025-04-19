@@ -40,7 +40,7 @@ export function BalanceDialog({ open, onOpenChange }: BalanceDialogProps) {
     setIsSubmitting(true)
     try {
       // Here you would typically update the balance in your state or database
-      console.log('Adding balance:', Number(values.balance))
+
       await new Promise(resolve => setTimeout(resolve, 1000)) // Simulate API call
       form.reset()
       onOpenChange(false)

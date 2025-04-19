@@ -345,7 +345,7 @@ class TransactionService {
    */
   async generateDueTransactions(userId: string | number, recurringTransactions?: any[]) {
     try {
-      console.log('Generating due transactions for user:', userId);
+
 
       if (!userId) {
         console.error('Cannot generate due transactions: userId is null or undefined');
@@ -356,11 +356,11 @@ class TransactionService {
       const transactions = recurringTransactions || await this.getRecurringTransactions(userId);
       
       if (!transactions || transactions.length === 0) {
-        console.log('No recurring transactions found for user:', userId);
+
         return [];
       }
 
-      console.log('Found recurring transactions:', transactions.length);
+
       
       // Get today's date (normalized to start of day)
       const today = new Date();
@@ -435,11 +435,11 @@ class TransactionService {
             }
             
             if (newTransaction) {
-              console.log(`Created transaction for recurring transaction ${rt.id} on date ${dateStr}`);
+
               createdTransactions.push(newTransaction);
             }
           } else {
-            console.log(`Transaction for recurring transaction ${rt.id} on date ${dateStr} already exists`);
+
           }
         }
       }
@@ -607,7 +607,7 @@ class TransactionService {
    */
   async predictUpcomingTransactions(userId: string | number, recurringTransactions?: any[], count: number = 2) {
     try {
-      console.log('Predicting upcoming transactions for user:', userId);
+
 
       if (!userId) {
         console.error('Cannot predict upcoming transactions: userId is null or undefined');
@@ -618,11 +618,11 @@ class TransactionService {
       const transactions = recurringTransactions || await this.getRecurringTransactions(userId);
       
       if (!transactions || transactions.length === 0) {
-        console.log('No recurring transactions found for user:', userId);
+
         return [];
       }
 
-      console.log('Found recurring transactions:', transactions.length);
+
       
       // Generate predicted upcoming transactions
       const predictedTransactions = [];

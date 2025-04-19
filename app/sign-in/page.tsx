@@ -40,7 +40,7 @@ function SignInForm() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true)
     try {
-      console.log('Attempting sign in with:', values.email);
+
       
       const { data, error } = await supabase.auth.signInWithPassword({
         email: values.email,

@@ -38,12 +38,18 @@ import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
 import { transactionTypes, TransactionType } from "@/data/transactiontypes"
-import { frequencies, FrequencyType } from "@/data/frequencies"
-import { useCategories } from "@/hooks/use-categories"
 import { accountTypes, AccountType } from "@/data/account-types"
+import { frequencies, FrequencyType } from "@/data/frequencies"
 import { transactionService } from '@/app/services/transaction-services'
+import { Transaction } from '@/app/types/transaction'
 import { BaseDialogProps, TransactionFormValues, transactionSchema } from '../shared/schema'
+import { createClient } from '@/utils/supabase/client'
+import { User } from '@supabase/supabase-js'
 import { useAuth } from '@/context/auth-context'
+
+// Redux imports
+import { useAppDispatch, useAppSelector } from '@/redux/hooks'
+import { fetchCategories } from '@/redux/slices/categoriesSlice'
 
 interface TransactionDialogProps extends Omit<BaseDialogProps, 'mode'> {
   initialData?: Partial<TransactionFormValues>;
@@ -59,8 +65,20 @@ export function TransactionDialog({
   mode = 'create'
 }: TransactionDialogProps) {
   const { user } = useAuth()
-  const { categories, loading: categoriesLoading, error: categoriesError } = useCategories()
-  console.log('TransactionDialog - categories:', { categories, loading: categoriesLoading, error: categoriesError })
+  
+  // Use Redux state for categories
+  const dispatch = useAppDispatch()
+  const { items: categories, status: categoriesStatus } = useAppSelector((state: any) => state.categories)
+  const categoriesLoading = categoriesStatus === 'loading'
+  const categoriesError = useAppSelector((state: any) => state.categories.error)
+  
+  // Fetch categories when component mounts or dialog opens
+  useEffect(() => {
+    if (user && isOpen && categoriesStatus !== 'loading') {
+      // Always fetch fresh categories when the dialog opens
+      dispatch(fetchCategories(user.id))
+    }
+  }, [user, isOpen, categoriesStatus, dispatch])
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const form = useForm<TransactionFormValues>({
@@ -81,7 +99,7 @@ export function TransactionDialog({
   // Reset form when initialData changes or dialog opens
   useEffect(() => {
     if (isOpen && initialData) {
-      console.log('Resetting form with initialData:', initialData)
+
       // Reset the form with the new values
       form.reset({
         name: "",
@@ -118,13 +136,8 @@ export function TransactionDialog({
 
       // Validate and log category selection
       const categoryId = Number(data.category_id)
-      const selectedCategory = categories.find(cat => cat.id === categoryId)
-      console.log('Category validation:', {
-        categoryId,
-        selectedCategory,
-        allCategories: categories.map(c => ({ id: c.id, name: c.name }))
-      })
-      
+      const selectedCategory = categories.find((cat: { id: number; name: string }) => cat.id === categoryId)
+
       if (!selectedCategory) {
         throw new Error(`Category ${categoryId} not found. Please select a valid category.`)
       }
@@ -135,7 +148,7 @@ export function TransactionDialog({
       // Check if we're in edit mode - if so, we don't create a new transaction
       // Instead, we'll just pass the data to the parent component via onSubmit
       if (mode === 'edit') {
-        console.log('Edit mode - passing data to parent component', data)
+
         // We don't need to do anything here - just pass the data to the parent
         // component which will handle the update
         result = { success: true }
@@ -344,7 +357,6 @@ export function TransactionDialog({
                           onSelect={(date) => {
                             if (date) {
                               field.onChange(date)
-                              form.setValue('date', date)
                             }
                           }}
                           disabled={(date) =>
@@ -425,11 +437,23 @@ export function TransactionDialog({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {categories?.map((category) => (
-                          <SelectItem key={category.id} value={String(category.id)}>
-                            {category.name}
+                        {categoriesLoading ? (
+                          <SelectItem value="loading" disabled>
+                            Loading categories...
                           </SelectItem>
-                        ))}
+                        ) : categoriesError ? (
+                          <SelectItem value="error" disabled>
+                            Error loading categories
+                          </SelectItem>
+                        ) : categories?.length > 0 ? (
+                          categories.map((cat: { id: number; name: string }) => (
+                            <SelectItem key={cat.id} value={cat.id.toString()}>
+                              {cat.name}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="1">Uncategorized</SelectItem>
+                        )}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -451,7 +475,7 @@ export function TransactionDialog({
                       </FormControl>
                       <SelectContent>
                         <SelectItem value="Never">One-time Transaction</SelectItem>
-                        {frequencies.map((freq) => (
+                        {frequencies.map((freq: { value: FrequencyType; label: string }) => (
                           <SelectItem key={freq.value} value={freq.value}>
                             {freq.label}
                           </SelectItem>
