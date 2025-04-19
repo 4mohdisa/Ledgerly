@@ -1,6 +1,6 @@
 import { configureStore } from '@reduxjs/toolkit';
 import { setupListeners } from '@reduxjs/toolkit/query';
-import transactionsReducer from './slices/transactionsSlice';
+import transactionsReducer from './features/transactions/transactionsSlice';
 import categoriesReducer from './slices/categoriesSlice';
 import recurringTransactionsReducer from './slices/recurringTransactionsSlice';
 import uiReducer from './slices/uiSlice';

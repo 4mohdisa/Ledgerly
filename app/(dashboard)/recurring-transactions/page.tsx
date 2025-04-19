@@ -17,7 +17,6 @@ import { Skeleton } from "@/components/ui/skeleton"
 const PieDonutChart = React.lazy(() => import("@/components/app/charts/pie-donut-chart"))
 const TransactionChart = React.lazy(() => import("@/components/app/charts/bar-chart-interactive"))
 import { UpcomingTransactionsTable } from '@/components/app/upcoming-transactions/upcoming-transactions-table'
-
 // Chart wrapper component to handle lazy loading with error boundary
 function ChartWrapper({ children }: { children: React.ReactNode }) {
   return (
@@ -26,6 +25,7 @@ function ChartWrapper({ children }: { children: React.ReactNode }) {
     </React.Suspense>
   )
 }
+
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -51,9 +51,6 @@ export default function RecurringTransactionsPage() {
   const { items: recurringTransactions, status: recurringStatus } = useAppSelector((state: any) => state.recurringTransactions)
   const { upcomingTransactions, upcomingStatus } = useAppSelector((state: any) => state.recurringTransactions)
   const { dateRange: reduxDateRange } = useAppSelector((state: any) => state.ui)
-  
-  // Determine loading states
-  const loading = recurringStatus === 'loading' || recurringStatus === 'idle'
   
   // Local state
   const [isAddTransactionOpen, setIsAddTransactionOpen] = useState(false)
@@ -252,6 +249,22 @@ export default function RecurringTransactionsPage() {
         {/* Analytics Charts Section */}
         <div className="mb-8">
           <h2 className="text-xl font-semibold mb-4">Transaction Analytics</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card className="border-none shadow-none bg-transparent lg:col-span-2">
+              <CardHeader>
+                <CardTitle>Recurring by Category</CardTitle>
+                <CardDescription>Distribution of recurring transactions</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ChartWrapper>
+                  <PieDonutChart />
+                </ChartWrapper>
+              </CardContent>
+            </Card>
+            <Card className="border-none shadow-none bg-transparent">
+              <CardHeader>
+                <CardTitle>Upcoming Transactions</CardTitle>
+                <CardDescription>Next 30 days transaction forecast</CardDescription>
               </CardHeader>
               <CardContent>
                 <ChartWrapper>
@@ -307,13 +320,16 @@ export default function RecurringTransactionsPage() {
           <CardContent className="p-0">
             <TransactionsTable
               loading={loading}
+              title="Active Recurring Transactions"
+              description="Manage your scheduled payments"
+              showAddButton={false} // Hide the Add New button since we have one at the top
               data={recurringTransactions.map((rt: any) => {
                 // Extract category name from the joined categories data
                 const categoryName = rt.categories?.name || '';
 
                 return {
-                  id: rt.id,
-                  user_id: rt.user_id,
+                  id: rt.id?.toString() || '', // Convert ID to string and handle undefined case
+                  user_id: rt.user_id?.toString() || '', // Also convert user_id to string
                   date: rt.start_date, // Map start_date to date for filtering
                   start_date: rt.start_date, // Include start_date for recurring transactions
                   end_date: rt.end_date,
@@ -327,8 +343,8 @@ export default function RecurringTransactionsPage() {
                   recurring_frequency: rt.frequency, // Use frequency from RecurringTransaction
                   created_at: rt.created_at,
                   updated_at: rt.updated_at
-                }
-              }) as Transaction[]}
+                };
+              }) as any}
               showFilters={true}
               showPagination={true}
               showRowsCount={true}

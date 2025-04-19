@@ -44,3 +44,25 @@ export function formatPercentage(value: number, decimalPlaces: number = 1): stri
     maximumFractionDigits: decimalPlaces,
   }).format(value);
 }
+
+/**
+ * Format a date string to a readable format
+ * @param dateString The date string to format (ISO format)
+ * @param format The format to use (default: 'MMM d, yyyy')
+ * @returns Formatted date string
+ */
+export function formatDate(dateString: string): string {
+  if (!dateString) return 'N/A';
+  
+  try {
+    const date = new Date(dateString);
+    return new Intl.DateTimeFormat('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    }).format(date);
+  } catch (error) {
+    console.error('Error formatting date:', error);
+    return 'Invalid date';
+  }
+}

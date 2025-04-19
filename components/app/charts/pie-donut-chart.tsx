@@ -1,33 +1,31 @@
 "use client"
 
-import * as React from "react";
+import React from "react";
 import { Pie, PieChart, Cell, ResponsiveContainer } from "recharts";
+import { PieChart as PieChartIcon } from 'lucide-react';
 import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
-  CardFooter,
 } from "@/components/ui/card";
-import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-} from "@/components/ui/chart";
-import { useAppSelector } from '@/redux/hooks';
+import { ChartTooltip } from "@/components/ui/chart";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useAppSelector } from '@/redux/hooks';
 import { formatCurrency } from "@/utils/format";
 
+// Chart color palette
 const COLORS = ["hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))", "hsl(var(--chart-5))", "hsl(var(--chart-6))"];
 
 // Process transactions data for the chart
-const processChartData = (transactions: any[]) => {
+const processChartData = (transactions) => {
   if (!transactions || transactions.length === 0) {
     return [];
   }
   
-  const categoryTotals = transactions.reduce((acc: Record<string, number>, transaction) => {
+  const categoryTotals = transactions.reduce((acc, transaction) => {
     const category = transaction.category_name || 'Uncategorized';
     if (!acc[category]) {
       acc[category] = 0;
@@ -41,30 +39,20 @@ const processChartData = (transactions: any[]) => {
     .map(([category, value]) => ({
       category,
       value
-    }));
+    }))
+    .sort((a, b) => b.value - a.value); // Sort by value descending
 };
 
-const PieDonutChart = () => {
-  // Get transactions from Redux store
-  const { items: transactions, status: transactionsStatus } = useAppSelector((state: any) => state.transactions);
+function PieDonutChart() {
+  const { items: transactions, status: transactionsStatus } = useAppSelector((state) => state.transactions);
   const isLoading = transactionsStatus === 'loading' || transactionsStatus === 'idle';
   
   // Process chart data
   const chartData = React.useMemo(() => {
-    // If loading, return empty array
-    if (isLoading) {
+    // If loading or no transactions, return empty array
+    if (isLoading || !transactions || transactions.length === 0) {
       return [];
     }
-    
-    // If no transactions, return default empty data with one category
-    if (!transactions || transactions.length === 0) {
-      return [{
-        category: 'No Data',
-        value: 0,
-        color: COLORS[0]
-      }];
-    }
-    
     return processChartData(transactions);
   }, [transactions, isLoading]);
   
@@ -74,127 +62,131 @@ const PieDonutChart = () => {
   }, [chartData]);
 
   // Only show loading skeleton when explicitly loading, not when there's no data
-  if (isLoading && transactionsStatus !== 'succeeded') {
+  if (isLoading) {
     return (
-      <Card className="flex flex-col w-full">
-        <CardHeader className="items-center pb-0">
+      <Card className="w-full h-full shadow-sm">
+        <CardHeader>
           <CardTitle>Category Distribution</CardTitle>
           <CardDescription>Spending Breakdown</CardDescription>
         </CardHeader>
-        <CardContent className="flex-1 pb-0">
-          <div className="mx-auto aspect-square w-full max-h-[250px] flex items-center justify-center">
+        <CardContent className="p-6">
+          <div className="flex items-center justify-center h-[250px]">
             <Skeleton className="h-[200px] w-[200px] rounded-full" />
           </div>
         </CardContent>
       </Card>
     );
   }
-
-  // We'll always show the chart, even with zero values
-  // This ensures we don't show loading skeletons indefinitely
+  
+  const hasData = chartData.length > 0 && totalSpending > 0;
 
   return (
-    <Card className="flex flex-col w-full">
-      <CardHeader className="items-center pb-0">
+    <Card className="w-full h-full shadow-sm hover:shadow-md transition-shadow duration-200">
+      <CardHeader>
         <CardTitle>Category Distribution</CardTitle>
         <CardDescription>Spending Breakdown</CardDescription>
       </CardHeader>
-      <CardContent className="flex-1 pb-0">
-        <div className="mx-auto aspect-square w-full max-h-[250px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie
-                data={chartData}
-                dataKey="value"
-                nameKey="category"
-                cx="50%"
-                cy="50%"
-                innerRadius={60}
-                outerRadius={80}
-                strokeWidth={5}
-              >
-                {chartData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                ))}
-                <text
-                  x="50%"
-                  y="50%"
-                  textAnchor="middle"
-                  dominantBaseline="middle"
+      <CardContent className="p-6">
+        {!hasData ? (
+          <div className="flex flex-col items-center justify-center h-[250px] text-center">
+            <div className="rounded-full bg-muted/30 w-24 h-24 mb-4 flex items-center justify-center">
+              <PieChartIcon className="h-10 w-10 text-muted-foreground" />
+            </div>
+            <p className="text-muted-foreground font-medium">No spending data yet</p>
+            <p className="text-sm text-muted-foreground mt-1">Add transactions to see your spending breakdown</p>
+          </div>
+        ) : (
+          <div className="h-[250px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={chartData}
+                  dataKey="value"
+                  nameKey="category"
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={80}
+                  strokeWidth={5}
                 >
-                  <tspan
+                  {chartData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                  <text
                     x="50%"
                     y="50%"
-                    className="fill-foreground text-3xl font-bold"
+                    textAnchor="middle"
+                    dominantBaseline="middle"
                   >
-                    {formatCurrency(totalSpending)}
-                  </tspan>
-                  <tspan
-                    x="50%"
-                    y="calc(50% + 24px)"
-                    className="fill-muted-foreground text-sm"
-                  >
-                    Total Spending
-                  </tspan>
-                </text>
-              </Pie>
-              <ChartTooltip
-                content={({ active, payload }) => {
-                  if (active && payload && payload.length) {
-                    const data = payload[0].payload;
-                    return (
-                      <div className="rounded-lg border bg-background p-2 shadow-sm">
-                        <div className="grid grid-cols-2 gap-2">
-                          <div className="flex flex-col">
-                            <span className="text-[0.70rem] uppercase text-muted-foreground">
-                              Category
-                            </span>
-                            <span className="font-bold text-muted-foreground">
-                              {data.category}
-                            </span>
-                          </div>
-                          <div className="flex flex-col">
-                            <span className="text-[0.70rem] uppercase text-muted-foreground">
-                              Amount
-                            </span>
-                            <span className="font-bold">
-                              {formatCurrency(data.value)}
-                            </span>
+                    <tspan
+                      x="50%"
+                      y="50%"
+                      className="fill-foreground text-3xl font-bold"
+                    >
+                      {formatCurrency(totalSpending)}
+                    </tspan>
+                    <tspan
+                      x="50%"
+                      y="calc(50% + 24px)"
+                      className="fill-muted-foreground text-sm"
+                    >
+                      Total Spending
+                    </tspan>
+                  </text>
+                </Pie>
+                <ChartTooltip
+                  content={({ active, payload }) => {
+                    if (active && payload && payload.length) {
+                      const data = payload[0].payload;
+                      return (
+                        <div className="rounded-lg border bg-background p-2 shadow-sm">
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="flex flex-col">
+                              <span className="text-[0.70rem] uppercase text-muted-foreground">
+                                Category
+                              </span>
+                              <span className="font-bold">
+                                {data.category}
+                              </span>
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="text-[0.70rem] uppercase text-muted-foreground">
+                                Amount
+                              </span>
+                              <span className="font-bold">{formatCurrency(data.value)}</span>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    );
-                  }
-                  return null;
-                }}
-              />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        )}
       </CardContent>
-      <CardFooter className="flex-col gap-2 text-sm">
-        {chartData.length > 0 && (
+      {hasData && (
+        <CardFooter className="flex-col gap-2 text-sm p-6 pt-0">
           <div className="flex items-center gap-2 font-medium leading-none">
             Top category: {chartData[0].category}
           </div>
-        )}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2 w-full">
-          {chartData.map((item, index) => (
-            <div key={item.category} className="flex items-center gap-2">
-              <div
-                className="w-3 h-3 rounded-full"
-                style={{ backgroundColor: COLORS[index % COLORS.length] }}
-              />
-              <div className="text-xs font-medium truncate">{item.category}</div>
-              <div className="ml-auto text-xs text-muted-foreground">
-                {formatCurrency(item.value)}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2 w-full">
+            {chartData.slice(0, 3).map((item, index) => (
+              <div key={item.category} className="flex items-center gap-2">
+                <div
+                  className="w-3 h-3 rounded-full"
+                  style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                />
+                <div className="text-xs font-medium truncate">{item.category}</div>
               </div>
-            </div>
-          ))}
-        </div>
-      </CardFooter>
+            ))}
+          </div>
+        </CardFooter>
+      )}
     </Card>
   );
-};
+}
 
 export default PieDonutChart;

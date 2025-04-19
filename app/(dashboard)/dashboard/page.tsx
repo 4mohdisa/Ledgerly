@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo, Suspense } from 'react'
 import { Button } from "@/components/ui/button"
-import { Upload, Plus, Menu } from 'lucide-react'
+import { Upload, Plus, Menu, CreditCard } from 'lucide-react'
 import { MetricsCards } from "@/components/app/metrics-cards"
 import { TransactionsTable } from "@/components/app/tables/transactions-table"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -345,7 +345,14 @@ export default function DashboardPage() {
           </div>
 
           <TransactionsTable
-            data={transactionsList}
+            data={transactionsList?.map(t => ({
+              ...t,
+              id: t.id?.toString() || '',
+              user_id: t.user_id?.toString() || '',
+              date: typeof t.date === 'string' ? t.date : (t.date ? format(t.date, 'yyyy-MM-dd') : ''),
+              // Ensure type is one of the expected values
+              type: t.type === 'Income' ? 'Income' : 'Expense'
+            })) as any} // Use type assertion to avoid TypeScript errors
             loading={isLoading}
             showFilters={false}
             showPagination={true}
@@ -355,6 +362,18 @@ export default function DashboardPage() {
               field: "date",
               order: "desc"
             }}
+            title="Recent Transactions"
+            description="Your latest financial activity"
+            showAddButton={false} // Using top Add Transaction button instead
+            customEmptyState={
+              <div className="flex flex-col items-center justify-center py-8">
+                <div className="rounded-full bg-muted/30 w-16 h-16 mb-4 flex items-center justify-center">
+                  <CreditCard className="h-8 w-8 text-muted-foreground" />
+                </div>
+                <p className="text-muted-foreground font-medium">No transactions yet</p>
+                <p className="text-sm text-muted-foreground mt-1 mb-4">Add your first transaction using the button above</p>
+              </div>
+            }
             onDelete={handleDeleteTransaction}
             onBulkDelete={handleBulkDelete}
             onEdit={handleEditTransaction}
