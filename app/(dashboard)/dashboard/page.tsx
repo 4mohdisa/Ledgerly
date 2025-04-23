@@ -14,21 +14,21 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 
-// Dynamic imports for heavy chart components
-const SpendingChart = React.lazy(() => import("@/components/app/charts/bar-chart-multiple"))
-const PieDonutChart = React.lazy(() => import("@/components/app/charts/pie-donut-chart"))
-const TransactionChart = React.lazy(() => import("@/components/app/charts/bar-chart-interactive"))
-const NetBalanceChart = React.lazy(() => import("@/components/app/charts/line-chart"))
+// Import chart components statically to avoid lazy loading issues
+import { SpendingChart } from '@/components/app/charts/bar-chart-multiple'
+import { PieDonutChart } from '@/components/app/charts/pie-donut-chart'
+import { TransactionChart } from '@/components/app/charts/bar-chart-interactive'
+import { NetBalanceChart } from '@/components/app/charts/line-chart'
 
 import { DateRange } from "react-day-picker"
 import { startOfMonth, endOfMonth, format, isFirstDayOfMonth } from "date-fns"
 
-// Chart wrapper component to handle lazy loading with error boundary
-function ChartWrapper({ children }: { children: React.ReactNode }) {
+// Chart loading placeholder component
+function ChartPlaceholder() {
   return (
-    <React.Suspense fallback={<div className="h-[300px] flex items-center justify-center"><p className="text-muted-foreground">Loading chart...</p></div>}>
-      {children}
-    </React.Suspense>
+    <div className="h-[300px] flex items-center justify-center">
+      <p className="text-muted-foreground">Loading chart...</p>
+    </div>
   )
 }
 import { useAuth } from '@/context/auth-context'
@@ -302,83 +302,68 @@ export default function DashboardPage() {
         <div className="space-y-8">
           <MetricsCards />
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-3">
-              <Card className="border-none shadow-none bg-transparent">
-                <CardContent>
-                  <ChartWrapper>
-                    <TransactionChart />
-                  </ChartWrapper>
+          {/* Transaction Analysis Chart - Full Width */}
+          <div className="w-full">
+            <Card className="border-none shadow-none bg-transparent w-full">
+              <CardContent className="p-0">
+                <TransactionChart />
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Three Analytics Charts - Equal Width and Height */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="w-full h-full">
+              <Card className="border-none shadow-none bg-transparent h-full">
+                <CardContent className="p-0 h-full">
+                  <NetBalanceChart />
                 </CardContent>
               </Card>
             </div>
 
-            <div className="lg:col-span-1">
-              <Card className="border-none shadow-none bg-transparent">
-                <CardContent>
-                  <ChartWrapper>
-                    <NetBalanceChart />
-                  </ChartWrapper>
+            <div className="w-full h-full">
+              <Card className="border-none shadow-none bg-transparent h-full">
+                <CardContent className="p-0 h-full">
+                  <SpendingChart />
                 </CardContent>
               </Card>
             </div>
 
-            <div>
-              <Card className="border-none shadow-none bg-transparent">
-                <CardContent>
-                  <ChartWrapper>
-                    <SpendingChart />
-                  </ChartWrapper>
-                </CardContent>
-              </Card>
-            </div>
-
-            <div>
-              <Card className="border-none shadow-none bg-transparent">
-                <CardContent>
-                  <ChartWrapper>
-                    <PieDonutChart />
-                  </ChartWrapper>
+            <div className="w-full h-full">
+              <Card className="border-none shadow-none bg-transparent h-full">
+                <CardContent className="p-0 h-full">
+                  <PieDonutChart />
                 </CardContent>
               </Card>
             </div>
           </div>
 
-          <TransactionsTable
-            data={transactionsList?.map(t => ({
-              ...t,
-              id: t.id?.toString() || '',
-              user_id: t.user_id?.toString() || '',
-              date: typeof t.date === 'string' ? t.date : (t.date ? format(t.date, 'yyyy-MM-dd') : ''),
-              // Ensure type is one of the expected values
-              type: t.type === 'Income' ? 'Income' : 'Expense'
-            })) as any} // Use type assertion to avoid TypeScript errors
-            loading={isLoading}
-            showFilters={false}
-            showPagination={true}
-            showRowsCount={true}
-            itemsPerPage={5}
-            sortBy={{
-              field: "date",
-              order: "desc"
-            }}
-            title="Recent Transactions"
-            description="Your latest financial activity"
-            showAddButton={false} // Using top Add Transaction button instead
-            customEmptyState={
-              <div className="flex flex-col items-center justify-center py-8">
-                <div className="rounded-full bg-muted/30 w-16 h-16 mb-4 flex items-center justify-center">
-                  <CreditCard className="h-8 w-8 text-muted-foreground" />
-                </div>
-                <p className="text-muted-foreground font-medium">No transactions yet</p>
-                <p className="text-sm text-muted-foreground mt-1 mb-4">Add your first transaction using the button above</p>
-              </div>
-            }
-            onDelete={handleDeleteTransaction}
-            onBulkDelete={handleBulkDelete}
-            onEdit={handleEditTransaction}
-            onBulkEdit={handleBulkEdit}
-          />
+          <div className="space-y-4">
+            <h2 className="text-xl font-semibold">Recent Transactions</h2>
+            <TransactionsTable
+              data={transactionsList?.slice(0, 7).map(t => ({
+                ...t,
+                id: t.id?.toString() || '',
+                user_id: t.user_id?.toString() || '',
+                date: typeof t.date === 'string' ? t.date : (t.date ? format(t.date, 'yyyy-MM-dd') : ''),
+                // Ensure type is one of the expected values
+                type: t.type === 'Income' ? 'Income' : 'Expense'
+              })) as any} // Use type assertion to avoid TypeScript errors
+              loading={isLoading}
+              showFilters={false}
+              showPagination={false}
+              showRowsCount={false}
+              itemsPerPage={7}
+              sortBy={{
+                field: "date",
+                order: "desc"
+              }}
+              onDelete={handleDeleteTransaction}
+              onBulkDelete={handleBulkDelete}
+              onEdit={handleEditTransaction}
+              onBulkEdit={handleBulkEdit}
+            />
+          </div>
         </div>
       </div>
 

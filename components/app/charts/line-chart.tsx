@@ -16,9 +16,7 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart"
-import { useAppSelector } from '@/redux/hooks'
-import { Skeleton } from "@/components/ui/skeleton"
-import { format, parseISO, subDays } from 'date-fns'
+import { transactions } from "@/data/transactions"
 
 interface DailyBalance {
   date: string
@@ -26,23 +24,7 @@ interface DailyBalance {
 }
 
 // Process transactions data for the chart
-const processTransactions = (transactions: any[]): DailyBalance[] => {
-  if (!transactions || transactions.length === 0) {
-    // Return empty data with the last 7 days if no transactions
-    const emptyData: DailyBalance[] = []
-    const today = new Date()
-    
-    for (let i = 6; i >= 0; i--) {
-      const date = subDays(today, i)
-      emptyData.push({
-        date: format(date, 'yyyy-MM-dd'),
-        balance: 0
-      })
-    }
-    
-    return emptyData
-  }
-  
+const processTransactions = (): DailyBalance[] => {
   const dailyNetBalance: { [key: string]: number } = {}
   
   transactions.forEach(transaction => {
@@ -50,7 +32,7 @@ const processTransactions = (transactions: any[]): DailyBalance[] => {
     if (!dailyNetBalance[date]) {
       dailyNetBalance[date] = 0
     }
-    dailyNetBalance[date] += transaction.type.toLowerCase() === "income" ? parseFloat(transaction.amount) : -parseFloat(transaction.amount)
+    dailyNetBalance[date] += transaction.type === "Income" ? transaction.amount : -transaction.amount
   })
 
   return Object.entries(dailyNetBalance)
@@ -69,18 +51,23 @@ const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
 }
 
-function NetBalanceChart() {
-  // Get transactions from Redux store
-  const { items: transactions, status: transactionsStatus } = useAppSelector((state: any) => state.transactions);
-  const isLoading = transactionsStatus === 'loading';
+export function NetBalanceChart() {
+  // Use useRef to track component mounted state
+  const isMounted = React.useRef(true);
+  const [chartData, setChartData] = React.useState(() => processTransactions());
+  const minBalance = Math.min(...chartData.map(d => d.balance));
+  const maxBalance = Math.max(...chartData.map(d => d.balance));
   
-  // Process the data
-  const chartData = React.useMemo(() => {
-    return processTransactions(transactions || []);
-  }, [transactions]);
-  
-  const minBalance = chartData.length > 0 ? Math.min(...chartData.map(d => d.balance)) : 0;
-  const maxBalance = chartData.length > 0 ? Math.max(...chartData.map(d => d.balance)) : 0;
+  // Add cleanup effect to prevent memory leaks and disconnection errors
+  React.useEffect(() => {
+    // Set mounted flag
+    isMounted.current = true;
+    
+    // Cleanup function
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
 
   return (
     <Card className="col-span-3 w-full">
@@ -95,6 +82,7 @@ function NetBalanceChart() {
           config={chartConfig}
           className="aspect-[16/9] w-full"
         >
+          {/* Use width and height as percentages to make it truly responsive */}
           <ResponsiveContainer>
             <LineChart
               data={chartData}
@@ -146,13 +134,14 @@ function NetBalanceChart() {
                 dataKey="balance"
                 stroke="hsl(var(--chart-1))"
                 strokeWidth={2}
-                dot={(props: any) => {
+                // Use activeDot with a function to determine color based on balance value
+                activeDot={(props: any) => {
                   const fillColor = props.payload.balance >= 0 
                     ? "hsl(var(--success))" 
                     : "hsl(var(--destructive))";
                   return (
                     <circle
-                      key={`dot-${props.dataKey}-${props.index}`}
+                      key={`dot-balance-${props.index}`}
                       cx={props.cx}
                       cy={props.cy}
                       r={4}
@@ -162,6 +151,14 @@ function NetBalanceChart() {
                     />
                   );
                 }}
+                // Use a simple dot object instead of a function to avoid TypeScript errors
+                dot={{
+                  r: 2,
+                  strokeWidth: 1,
+                  // We'll use the activeDot for custom coloring instead
+                  fill: "hsl(var(--chart-1))",
+                  stroke: "hsl(var(--chart-1))"
+                }}
               />
             </LineChart>
           </ResponsiveContainer>
@@ -170,5 +167,3 @@ function NetBalanceChart() {
     </Card>
   )
 }
-
-export default NetBalanceChart;

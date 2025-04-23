@@ -8,9 +8,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { useAppSelector } from '@/redux/hooks'
 import { Skeleton } from "@/components/ui/skeleton"
 import { formatCurrency } from "@/utils/format"
+import { useAppSelector } from "@/redux/hooks"
 
 const MetricCard = React.memo(({ title, value, icon: Icon, color, onClick }: {
   title: string

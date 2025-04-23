@@ -72,13 +72,63 @@ export function TransactionDialog({
   const categoriesLoading = categoriesStatus === 'loading'
   const categoriesError = useAppSelector((state: any) => state.categories.error)
   
+  // Local state for categories to ensure they're available even if Redux state is delayed
+  const [localCategories, setLocalCategories] = useState<Array<{id: number, name: string}>>([])
+  
   // Fetch categories when component mounts or dialog opens
   useEffect(() => {
-    if (user && isOpen && categoriesStatus !== 'loading') {
+    if (user && isOpen) {
       // Always fetch fresh categories when the dialog opens
-      dispatch(fetchCategories(user.id))
+      dispatch(fetchCategories(user.id));
+      
+      // Fallback: Fetch categories directly if Redux state is empty
+      if (!categories || categories.length === 0) {
+        const fetchCategoriesDirectly = async () => {
+          try {
+            const supabase = createClient();
+            // Fetch ALL categories without any filtering
+            const { data, error } = await supabase
+              .from('categories')
+              .select('id, name')
+              .order('name');
+              
+            console.log(`Retrieved ${data?.length || 0} categories from database`);
+            
+            // No need to filter by user_id - we want to show all categories
+              
+            if (error) throw error;
+            if (data && data.length > 0) {
+              setLocalCategories(data);
+            }
+          } catch (err) {
+            console.error('Error fetching categories directly:', err);
+          }
+        };
+        
+        fetchCategoriesDirectly();
+      }
     }
-  }, [user, isOpen, categoriesStatus, dispatch])
+  }, [user, isOpen, dispatch, categories])
+  
+  // Sync Redux categories to local state when they change
+  useEffect(() => {
+    if (categories && categories.length > 0) {
+      console.log(`Syncing ${categories.length} categories to local state`);
+      setLocalCategories(categories.map((cat: { id: number; name: string }) => ({
+        id: cat.id,
+        name: cat.name
+      })));
+    }
+  }, [categories])
+  
+  // Log local categories whenever they change
+  useEffect(() => {
+    console.log(`Local categories count: ${localCategories.length}`);
+    if (localCategories.length > 0) {
+      console.log('First few categories:', localCategories.slice(0, 3));
+      console.log('Last few categories:', localCategories.slice(-3));
+    }
+  }, [localCategories])
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const form = useForm<TransactionFormValues>({
@@ -436,17 +486,23 @@ export function TransactionDialog({
                           <SelectValue placeholder="Select category" />
                         </SelectTrigger>
                       </FormControl>
-                      <SelectContent>
-                        {categoriesLoading ? (
+                      {/* Override the default SelectContent to ensure proper scrolling */}
+                      <SelectContent 
+                        className=""
+                        position="popper"
+                        sideOffset={8}
+                      >
+                        <div className="max-h-[200px] overflow-y-auto py-1">
+                        {categoriesLoading && localCategories.length === 0 ? (
                           <SelectItem value="loading" disabled>
                             Loading categories...
                           </SelectItem>
-                        ) : categoriesError ? (
+                        ) : categoriesError && localCategories.length === 0 ? (
                           <SelectItem value="error" disabled>
                             Error loading categories
                           </SelectItem>
-                        ) : categories?.length > 0 ? (
-                          categories.map((cat: { id: number; name: string }) => (
+                        ) : localCategories.length > 0 ? (
+                          localCategories.map((cat: { id: number; name: string }) => (
                             <SelectItem key={cat.id} value={cat.id.toString()}>
                               {cat.name}
                             </SelectItem>
@@ -454,6 +510,7 @@ export function TransactionDialog({
                         ) : (
                           <SelectItem value="1">Uncategorized</SelectItem>
                         )}
+                        </div>
                       </SelectContent>
                     </Select>
                     <FormMessage />

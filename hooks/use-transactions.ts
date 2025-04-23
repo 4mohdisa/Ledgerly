@@ -67,9 +67,18 @@ export function useTransactions(dateRange?: DateRange) {
 
     fetchTransactions()
 
-    // Set up real-time subscription to transactions table
+    // Temporarily disable real-time subscription to avoid WebSocket CSP issues
+    // Will implement a polling-based solution instead
     if (user?.id) {
-      // Enable real-time subscription for the transactions table
+      // Set up a polling interval to refresh data periodically
+      const pollingInterval = setInterval(() => {
+        refresh();
+      }, 30000); // Poll every 30 seconds
+      
+      // Return cleanup function to clear the interval
+      return () => clearInterval(pollingInterval);
+      
+      /* Original realtime code - temporarily disabled
       subscription = supabase
         .channel('transactions-changes')
         .on('postgres_changes', {
@@ -78,12 +87,10 @@ export function useTransactions(dateRange?: DateRange) {
           table: 'transactions',
           filter: `user_id=eq.${user.id}` // Only listen for changes to this user's transactions
         }, () => {
-
           refresh() // Refresh the transactions list when a change is detected
         })
         .subscribe()
-
-
+      */
     }
 
     // Clean up subscription when component unmounts or dependencies change

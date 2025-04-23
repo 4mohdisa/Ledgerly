@@ -1,49 +1,34 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-
-interface LoadingState {
-  [key: string]: boolean;
-}
+import { DateRange } from 'react-day-picker';
 
 interface UIState {
-  loading: LoadingState;
-  dateRange: {
-    from: string | null;
-    to: string | null;
-  };
-  selectedDate: string | null;
+  dateRange: DateRange | null;
+  sidebarOpen: boolean;
 }
 
 const initialState: UIState = {
-  loading: {
-    transactions: false,
-    categories: false,
-    recurringTransactions: false,
-    upcomingTransactions: false,
-  },
-  dateRange: {
-    from: null,
-    to: null,
-  },
-  selectedDate: null,
+  dateRange: null,
+  sidebarOpen: false
 };
 
-export const uiSlice = createSlice({
+/**
+ * UI slice for managing UI-related state
+ */
+const uiSlice = createSlice({
   name: 'ui',
   initialState,
   reducers: {
-    setLoading: (state, action: PayloadAction<{ key: string; value: boolean }>) => {
-      const { key, value } = action.payload;
-      state.loading[key] = value;
-    },
-    setDateRange: (state, action: PayloadAction<{ from: string | null; to: string | null }>) => {
+    setDateRange: (state, action: PayloadAction<DateRange | null>) => {
       state.dateRange = action.payload;
     },
-    setSelectedDate: (state, action: PayloadAction<string | null>) => {
-      state.selectedDate = action.payload;
+    toggleSidebar: (state) => {
+      state.sidebarOpen = !state.sidebarOpen;
     },
-  },
+    setSidebarOpen: (state, action: PayloadAction<boolean>) => {
+      state.sidebarOpen = action.payload;
+    }
+  }
 });
 
-export const { setLoading, setDateRange, setSelectedDate } = uiSlice.actions;
-
+export const { setDateRange, toggleSidebar, setSidebarOpen } = uiSlice.actions;
 export default uiSlice.reducer;

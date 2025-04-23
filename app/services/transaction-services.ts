@@ -393,12 +393,15 @@ class TransactionService {
           // Check if this transaction already exists in the database
           const dateStr = nextDate.toISOString().split('T')[0];
           
+          // Check for existing transactions by matching user_id, date, name, and amount
+          // since recurring_transaction_id column doesn't exist
           const { data: existingTransactions, error: checkError } = await this.supabase
             .from('transactions')
             .select('*')
             .eq('user_id', userId.toString())
-            .eq('recurring_transaction_id', rt.id)
-            .eq('date', dateStr);
+            .eq('date', dateStr)
+            .eq('name', rt.name)
+            .eq('amount', rt.amount);
             
           if (checkError) {
             console.error('Error checking for existing transaction:', checkError);
@@ -407,14 +410,14 @@ class TransactionService {
           
           // Only create the transaction if it doesn't already exist
           if (!existingTransactions || existingTransactions.length === 0) {
-            // Create the actual transaction
+            // Create the actual transaction without recurring_transaction_id
+            // Add a note in the description to indicate this was generated from a recurring transaction
             const transactionData = {
               user_id: userId.toString(),
-              recurring_transaction_id: rt.id,
               name: rt.name,
               amount: rt.amount,
               date: dateStr,
-              description: rt.description,
+              description: rt.description ? `${rt.description} (From recurring transaction)` : 'From recurring transaction',
               type: rt.type,
               account_type: rt.account_type,
               category_id: rt.category_id,
@@ -638,10 +641,10 @@ class TransactionService {
         for (const date of nextDates) {
           const dateStr = date.toISOString().split('T')[0];
           
-          // Create a predicted upcoming transaction
+          // Create a predicted upcoming transaction without recurring_transaction_id
+          // Add a note in the description to indicate this is from a recurring transaction
           predictedTransactions.push({
             id: `${rt.id}-${dateStr}`, // Generate a predictable ID
-            recurring_transaction_id: rt.id,
             user_id: userId,
             category_id: rt.category_id,
             category_name: rt.categories?.name || rt.category_name || 'Uncategorized',
@@ -650,10 +653,13 @@ class TransactionService {
             type: rt.type,
             name: rt.name,
             account_type: rt.account_type,
-            description: rt.description,
+            description: rt.description ? `${rt.description} (Upcoming)` : 'Upcoming transaction',
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
-            predicted: true // Flag to indicate this is a predicted transaction
+            predicted: true, // Flag to indicate this is a predicted transaction
+            // Store the recurring transaction ID in a property that won't be sent to the database
+            // but can be used for reference in the UI
+            _recurring_transaction_id: rt.id
           });
         }
       }

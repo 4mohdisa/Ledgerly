@@ -42,13 +42,13 @@ import { frequencies, FrequencyType } from "@/data/frequencies"
 import { accountTypes, AccountType } from "@/data/account-types"
 
 // Redux imports
-import { useAppDispatch, useAppSelector } from '@/redux/hooks'
-import { fetchCategories } from '@/redux/slices/categoriesSlice'
 import { transactionService } from '@/app/services/transaction-services'
 import { RecurringTransaction, UpdateRecurringTransaction } from '@/app/types/transaction'
 import { BaseDialogProps, RecurringTransactionFormValues, recurringTransactionSchema } from '../shared/schema'
 import { createClient } from '@/utils/supabase/client'
 import { User } from '@supabase/supabase-js'
+import { useAppDispatch, useAppSelector } from '@/redux/hooks'
+import { fetchCategories } from '@/redux/slices/categoriesSlice'
 
 interface RecurringTransactionDialogProps extends BaseDialogProps {
   onSubmit?: (data: RecurringTransactionFormValues) => void
@@ -174,10 +174,42 @@ export function RecurringTransactionDialog({
       // Pass the data to the transaction service based on mode
       if (mode === 'create') {
         await transactionService.createRecurringTransaction(submissionData)
+        // Reset form and close dialog after successful creation
+        form.reset()
+        onClose()
       } else if (mode === 'edit') {
-        // For edit mode, we need to call the update function
-        // The onSubmit handler in the parent component will handle the actual API call
-        // We just need to pass the formatted data back
+        // For edit mode, we call the onSubmit handler with the formatted data
+        // The parent component will handle the actual API call
+        if (onSubmit) {
+          try {
+            // Convert dates back to Date objects for the form values
+            const formattedData: RecurringTransactionFormValues = {
+              name: data.name,
+              amount: data.amount,
+              type: data.type,
+              account_type: data.account_type,
+              category_id: data.category_id,
+              frequency: data.frequency,
+              description: data.description,
+              // Keep the original Date objects from the form
+              start_date: data.start_date,
+              end_date: data.end_date,
+            }
+            
+            // Pass the properly formatted data to onSubmit
+            // We're not closing the dialog here - let the parent component handle that
+            // after the update is complete
+            await onSubmit(formattedData)
+            
+            // Don't close the dialog here - the parent will handle it
+            // This allows the loading state to be visible
+          } catch (error) {
+            console.error('Error in onSubmit handler:', error)
+            toast.error('Failed to update transaction')
+            // Reset isSubmitting state on error
+            setIsSubmitting(false)
+          }
+        }
       }
 
       toast.success(`${mode === 'create' ? 'Created' : 'Updated'} recurring transaction`, {

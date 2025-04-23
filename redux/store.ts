@@ -1,25 +1,24 @@
 import { configureStore } from '@reduxjs/toolkit';
-import { setupListeners } from '@reduxjs/toolkit/query';
-import transactionsReducer from './features/transactions/transactionsSlice';
-import categoriesReducer from './slices/categoriesSlice';
 import recurringTransactionsReducer from './slices/recurringTransactionsSlice';
 import uiReducer from './slices/uiSlice';
+import categoriesReducer from './slices/categoriesSlice';
+import transactionsReducer from './slices/transactionsSlice';
 
+/**
+ * Redux store configuration
+ */
 export const store = configureStore({
   reducer: {
-    transactions: transactionsReducer,
-    categories: categoriesReducer,
     recurringTransactions: recurringTransactionsReducer,
     ui: uiReducer,
+    categories: categoriesReducer,
+    transactions: transactionsReducer
   },
-  middleware: (getDefaultMiddleware) =>
+  middleware: (getDefaultMiddleware) => 
     getDefaultMiddleware({
-      serializableCheck: false,
-    }),
+      serializableCheck: false // Allow non-serializable values in state
+    })
 });
-
-// Enable listener behavior for RTK Query
-setupListeners(store.dispatch);
 
 // Infer the `RootState` and `AppDispatch` types from the store itself
 export type RootState = ReturnType<typeof store.getState>;

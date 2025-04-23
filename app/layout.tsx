@@ -1,5 +1,5 @@
 import "./globals.css";
-import { AuthProvider } from '@/context/auth-context'
+import { AuthProvider } from '@/context/auth-context';
 import { ReduxProvider } from '@/redux/provider';
 import localFont from "next/font/local";
 
@@ -20,6 +20,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        {/* CSP is now handled in next.config.js */}
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         suppressHydrationWarning
