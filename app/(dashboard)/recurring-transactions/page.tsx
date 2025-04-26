@@ -80,9 +80,10 @@ export default function RecurringTransactionsPage() {
     console.log('Updating transaction:', transaction);
     
     // Ensure we have a clean transaction object without any extra properties
-    const cleanTransaction: RecurringTransaction = {
+    // We'll omit user_id from the update data since it's a UUID and only used for filtering
+    // This prevents type conversion errors in Supabase
+    const cleanTransaction: Omit<RecurringTransaction, 'user_id'> = {
       id: transaction.id,
-      user_id: transaction.user_id,
       name: transaction.name,
       amount: transaction.amount,
       type: transaction.type,
@@ -328,57 +329,46 @@ export default function RecurringTransactionsPage() {
           setIsEditRecurringTransactionOpen(false);
           setEditingRecurringTransaction(null);
         }}
-        onSubmit={async (formData: any) => {
-          return new Promise<void>(async (resolve, reject) => {
-            try {
-              if (user && editingRecurringTransaction?.id) {
-                console.log('RecurringTransactionDialog onSubmit received formData:', formData);
-                
-                // Convert form data to RecurringTransaction type
-                const transaction: RecurringTransaction = {
-                  id: editingRecurringTransaction.id,
-                  user_id: user.id,
-                  name: formData.name,
-                  amount: formData.amount,
-                  type: formData.type,
-                  account_type: formData.account_type,
-                  category_id: Number(formData.category_id),
-                  description: formData.description || '',
-                  // Ensure dates are properly formatted
-                  start_date: formData.start_date instanceof Date ? formData.start_date.toISOString() : formData.start_date,
-                  end_date: formData.end_date instanceof Date ? formData.end_date.toISOString() : formData.end_date,
-                  frequency: formData.frequency,
-                  created_at: editingRecurringTransaction.created_at || new Date().toISOString(),
-                  updated_at: new Date().toISOString()
-                };
-                
-                console.log('Calling handleEditSuccess with transaction:', transaction);
-                
-                try {
-                  // Wait for the update to complete before closing the dialog
-                  await handleEditSuccess(transaction);
-                  
-                  // Only close the dialog after the update is complete
-                  setIsEditRecurringTransactionOpen(false);
-                  setEditingRecurringTransaction(null);
-                  
-                  // Resolve the promise to signal completion to the dialog
-                  resolve();
-                } catch (updateError) {
-                  console.error('Error updating transaction:', updateError);
-                  reject(updateError);
-                }
-              } else {
-                console.error('Missing user or transaction ID');
-                toast.error('Cannot update: Missing required information');
-                reject(new Error('Missing user or transaction ID'));
-              }
-            } catch (error) {
-              console.error('Error in dialog submission:', error);
-              toast.error('Failed to process form submission');
-              reject(error);
-            }
-          });
+        onSubmit={async (formData) => {
+          if (!user || !editingRecurringTransaction?.id) {
+            console.error('Missing user or transaction ID');
+            toast.error('Cannot update: Missing required information');
+            return;
+          }
+          
+          try {
+            console.log('Processing edit submission:', formData);
+            
+            // Convert form data to RecurringTransaction type
+            const transaction: RecurringTransaction = {
+              id: editingRecurringTransaction.id,
+              user_id: user.id,
+              name: formData.name,
+              amount: formData.amount,
+              type: formData.type,
+              account_type: formData.account_type,
+              category_id: Number(formData.category_id),
+              description: formData.description || '',
+              // Ensure dates are properly formatted
+              start_date: formData.start_date instanceof Date ? formData.start_date.toISOString() : formData.start_date,
+              end_date: formData.end_date instanceof Date ? formData.end_date.toISOString() : formData.end_date,
+              frequency: formData.frequency,
+              created_at: editingRecurringTransaction.created_at || new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            };
+            
+            // Wait for the update to complete
+            await handleEditSuccess(transaction);
+            
+            // Only close the dialog after successful update
+            setIsEditRecurringTransactionOpen(false);
+            setEditingRecurringTransaction(null);
+          } catch (error) {
+            console.error('Error updating transaction:', error);
+            // Error is already handled in handleEditSuccess
+            // We don't close the dialog on error
+            throw error; // Re-throw to let the dialog component handle it
+          }
         }}
         initialData={editingRecurringTransaction as any}
         mode="edit"

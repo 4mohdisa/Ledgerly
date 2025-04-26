@@ -2,6 +2,20 @@ import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { Transaction, RecurringTransaction } from '@/app/types/transaction';
 import { createClient } from '@/utils/supabase/client';
 
+/**
+ * Simple string hash function to convert a string to a number
+ * This is used to generate numeric IDs from string values
+ */
+function hashCode(str: string): number {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return hash;
+}
+
 // State interface
 interface RecurringTransactionsState {
   items: RecurringTransaction[];
@@ -27,24 +41,52 @@ const initialState: RecurringTransactionsState = {
 /**
  * Fetch recurring transactions
  */
-export const fetchRecurringTransactions = createAsyncThunk(
+export const fetchRecurringTransactions = createAsyncThunk<RecurringTransaction[], string>(
   'recurringTransactions/fetchRecurringTransactions',
-  async (userId: string) => {
-    const supabase = createClient();
-    
-    // Cast the userId parameter directly to avoid TypeScript errors
-    // This is a workaround for Supabase's inconsistent typing
-    const { data, error } = await supabase
-      .from('recurring_transactions')
-      .select('*, categories(name)')
-      .eq('user_id', userId as any)
-      .order('created_at', { ascending: false } as any);
+  async (userId: string, { rejectWithValue }) => {
+    try {
+      const supabase = createClient();
       
-    if (error) {
-      throw new Error(error.message);
+      console.log('Fetching recurring transactions for user:', userId);
+      
+      const { data, error } = await supabase
+        .from('recurring_transactions')
+        .select('*, categories(name)')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+        
+      if (error) {
+        console.error('Error fetching recurring transactions:', error);
+        return rejectWithValue(error.message);
+      }
+      
+      // Process the data to ensure it's properly formatted
+      const processedData = (data || []).map(item => {
+        // Extract category name from nested object if present
+        let categoryName = null;
+        if (item.categories && 'name' in item.categories) {
+          categoryName = item.categories.name;
+        }
+        
+        return {
+          ...item,
+          // Ensure category_id is a number
+          category_id: typeof item.category_id === 'string' 
+            ? parseInt(item.category_id, 10) 
+            : item.category_id,
+          // Set category_name from extracted value
+          category_name: categoryName,
+          // Remove categories object to avoid nesting issues
+          categories: undefined
+        };
+      });
+      
+      console.log('Fetched recurring transactions:', processedData.length);
+      return processedData as RecurringTransaction[];
+    } catch (error) {
+      console.error('Unexpected error in fetchRecurringTransactions:', error);
+      return rejectWithValue(error instanceof Error ? error.message : 'An unexpected error occurred');
     }
-    
-    return data as RecurringTransaction[];
   }
 );
 
@@ -54,29 +96,46 @@ export const fetchRecurringTransactions = createAsyncThunk(
 export const fetchUpcomingTransactions = createAsyncThunk<Transaction[], string>(
   'recurringTransactions/fetchUpcomingTransactions',
   async (userId: string, { getState }): Promise<Transaction[]> => {
-    // Get the current state to access recurring transactions
-    const state = getState() as any;
-    const recurringTransactions = state.recurringTransactions.items;
-    
-    // If we don't have recurring transactions yet, fetch them first
-    if (!recurringTransactions || recurringTransactions.length === 0) {
-      // Fetch recurring transactions first
-      const supabase = createClient();
-      const { data, error } = await supabase
-        .from('recurring_transactions')
-        .select('*, categories(name)')
-        .eq('user_id', userId as any);
+    try {
+      // Get the current state to access recurring transactions
+      const state = getState() as any;
+      const recurringTransactions = state.recurringTransactions.items;
+      
+      // If we don't have recurring transactions yet, fetch them first
+      if (!recurringTransactions || recurringTransactions.length === 0) {
+        // Fetch recurring transactions first
+        const supabase = createClient();
+        const { data, error } = await supabase
+          .from('recurring_transactions')
+          .select('*, categories(name)')
+          .eq('user_id', userId);
+          
+        if (error) {
+          console.error('Error fetching recurring transactions:', error);
+          throw new Error(error.message);
+        }
         
-      if (error) {
-        throw new Error(error.message);
+        // Process the data to ensure it's properly formatted
+        const processedData = (data || []).map(item => ({
+          ...item,
+          // Ensure category_id is a number
+          category_id: typeof item.category_id === 'string' 
+            ? parseInt(item.category_id, 10) 
+            : item.category_id,
+          // Extract category name from nested object if present
+          category_name: item.categories?.name || null
+        }));
+        
+        // Use the fetched recurring transactions
+        return generateUpcomingTransactionsFromRecurring(processedData, userId);
       }
       
-      // Use the fetched recurring transactions
-      return generateUpcomingTransactionsFromRecurring(data || [], userId);
+      // Generate upcoming transactions from the recurring transactions in state
+      return generateUpcomingTransactionsFromRecurring(recurringTransactions, userId);
+    } catch (error) {
+      console.error('Error in fetchUpcomingTransactions:', error);
+      throw error;
     }
-    
-    // Generate upcoming transactions from the recurring transactions in state
-    return generateUpcomingTransactionsFromRecurring(recurringTransactions, userId);
   }
 );
 
@@ -103,8 +162,15 @@ function generateUpcomingTransactionsFromRecurring(recurringTransactions: any[],
     
     // Create transaction objects for each upcoming date
     nextDates.forEach((date, index) => {
+      // Generate a unique ID that works for both numeric and string IDs
+      // For numeric IDs, multiply by 1000 and add index
+      // For string IDs, use a hash function to generate a numeric ID
+      const uniqueId = typeof recurringTx.id === 'number' 
+        ? recurringTx.id * 1000 + index
+        : Math.abs(hashCode(recurringTx.id + '-' + index.toString()));
+      
       upcomingTransactions.push({
-        id: recurringTx.id * 1000 + index, // Generate a unique ID
+        id: uniqueId,
         user_id: userId,
         name: recurringTx.name,
         amount: recurringTx.amount,
@@ -214,8 +280,11 @@ export const updateRecurringTransaction = createAsyncThunk<RecurringTransaction,
     try {
       const supabase = createClient();
       // Convert any Date objects to ISO strings before updating
+      // Also ensure we're not updating user_id as it's a UUID and used as a filter
+      const { user_id, ...dataWithoutUserId } = data;
+      
       const formattedData = {
-        ...data,
+        ...dataWithoutUserId,
         start_date: data.start_date instanceof Date 
           ? data.start_date.toISOString() 
           : data.start_date,

@@ -8,12 +8,6 @@ Ledgerly is a financial application that helps users manage their finances by tr
 3. Monthly Balance Tracking - Users can record their bank balance at the beginning of each month to monitor financial progress and reconcile accounts.
 4. Document Transaction Extraction - A planned future feature that will allow users to extract transaction details directly from financial documents, eliminating manual entry (to be implemented after core features are complete).
 
-Code Style
-1. Write concise, technical TypeScript code with accurate examples
-2. Use functional and declarative programming patterns; avoid classes
-3. Prefer iteration and modularization over code duplication
-4. Use descriptive variable names with auxiliary verbs (e.g., isLoading, hasError)
-
 Tech Stack
 1. My build system is Next.js (version 14.1.0)
 2. My frontend framework is React (version 18.2.0)
@@ -27,15 +21,3 @@ Tech Stack
 10. I have AI capabilities via LlamaIndex (version 0.8.30) and OpenAI (version 4.77.3)
 11. My linting is handled by ESLint (version 8.57.1)
 12. I use various utility libraries including lodash (version 4.17.21), date-fns (version 3.6.0), and mathjs (version 14.0.1)
-
-TypeScript Usage
-1. Use TypeScript for all code; prefer interfaces over types
-2. Avoid enums; use const objects with 'as const' assertion
-3. Use functional components with TypeScript interfaces
-4. Define strict types for message passing between different parts of the extension
-5. Avoid try/catch blocks unless there's good reason to translate or handle error in that abstraction
-6. Use explicit return types for all functions
-
-Use Shadcn UI and Radix for components
-1. Use npx shadcn@latest add <component-name> to add new shadcn components
-2. Implement Tailwind CSS for styling

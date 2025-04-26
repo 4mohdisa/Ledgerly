@@ -37,21 +37,22 @@ import {
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
-import { transactionTypes, TransactionType } from "@/data/transactiontypes"
-import { frequencies, FrequencyType } from "@/data/frequencies"
-import { accountTypes, AccountType } from "@/data/account-types"
-
-// Redux imports
+import { transactionTypes } from "@/data/transactiontypes"
+import { frequencies } from "@/data/frequencies"
+import { categories } from "@/data/categories"
+import { accountTypes } from "@/data/account-types"
 import { transactionService } from '@/app/services/transaction-services'
 import { RecurringTransaction, UpdateRecurringTransaction } from '@/app/types/transaction'
 import { BaseDialogProps, RecurringTransactionFormValues, recurringTransactionSchema } from '../shared/schema'
 import { createClient } from '@/utils/supabase/client'
 import { User } from '@supabase/supabase-js'
-import { useAppDispatch, useAppSelector } from '@/redux/hooks'
-import { fetchCategories } from '@/redux/slices/categoriesSlice'
+import { TransactionType } from '@/data/transactiontypes'
+import { AccountType } from '@/data/account-types'
+import { FrequencyType } from '@/data/frequencies'
 
-interface RecurringTransactionDialogProps extends BaseDialogProps {
+interface RecurringTransactionDialogProps extends Omit<BaseDialogProps, 'initialData'> {
   onSubmit?: (data: RecurringTransactionFormValues) => void
+  initialData?: RecurringTransaction | null
 }
 
 function useUser() {
@@ -62,12 +63,10 @@ function useUser() {
     const getUser = async () => {
       const { data: { session }, error } = await supabase.auth.getSession()
       if (error) {
-        console.error('Error getting session:', error)
+        console.error('Error fetching user:', error)
         return
       }
-      if (session) {
-        setUser(session.user)
-      }
+      setUser(session?.user ?? null)
     }
 
     getUser()
@@ -79,7 +78,7 @@ function useUser() {
     return () => {
       subscription.unsubscribe()
     }
-  }, [])
+  }, [supabase.auth])
 
   return { user }
 }
@@ -92,19 +91,6 @@ export function RecurringTransactionDialog({
   mode,
 }: RecurringTransactionDialogProps) {
   const { user } = useUser()
-  
-  // Use Redux state for categories
-  const dispatch = useAppDispatch()
-  const { items: categories, status: categoriesStatus } = useAppSelector((state: any) => state.categories)
-  const categoriesLoading = categoriesStatus === 'loading' || categoriesStatus === 'idle'
-  
-  // Fetch categories when component mounts if they're not already loaded
-  useEffect(() => {
-    if (user && categories.length === 0 && categoriesStatus !== 'loading') {
-      dispatch(fetchCategories(user.id))
-    }
-  }, [user, categories.length, categoriesStatus, dispatch])
-  
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const form = useForm<RecurringTransactionFormValues>({
@@ -113,35 +99,41 @@ export function RecurringTransactionDialog({
       name: "",
       description: "",
       amount: 0,
-      type: "Expense", // Corrected case to match TransactionType
-      account_type: "Cash", // Corrected case to match AccountType
+      type: "Expense" as TransactionType,
+      account_type: "Cash" as AccountType,
       category_id: "",
-      frequency: "Monthly" as FrequencyType, // Corrected case to match FrequencyType
+      frequency: "Monthly" as FrequencyType,
       start_date: new Date(),
-      ...initialData,
+      // Do not spread initialData here as it may contain fields not in RecurringTransactionFormValues
     },
   })
   
   // Reset form with initialData when it changes or when dialog opens
   useEffect(() => {
     if (isOpen && initialData) {
-
-      // Reset the form with the initial values plus any new initialData
-      form.reset({
-        name: "",
-        description: "",
-        amount: 0,
-        type: "Expense",
-        account_type: "Cash",
-        category_id: "",
-        frequency: "Monthly" as FrequencyType,
-        start_date: new Date(),
-        ...initialData
-      })
+      console.log('Resetting form with initialData:', initialData)
+      
+      // Map initialData to the form values format
+      const formValues: RecurringTransactionFormValues = {
+        name: initialData.name || "",
+        description: initialData.description || "",
+        amount: initialData.amount || 0,
+        type: (initialData.type as TransactionType) || "Expense" as TransactionType,
+        account_type: (initialData.account_type as AccountType) || "Cash" as AccountType,
+        category_id: initialData.category_id?.toString() || "",
+        frequency: (initialData.frequency as FrequencyType) || "Monthly" as FrequencyType,
+        start_date: initialData.start_date ? new Date(initialData.start_date) : new Date(),
+        end_date: initialData.end_date ? new Date(initialData.end_date as string) : undefined
+      }
+      
+      // Reset the form with the properly mapped values
+      form.reset(formValues)
     }
   }, [form, initialData, isOpen])
 
   const handleSubmit = async (data: RecurringTransactionFormValues) => {
+    console.log('RecurringTransactionDialog handleSubmit received data:', data);
+    
     if (!user?.id) {
       toast.error("Authentication required", {
         description: "Please sign in to create recurring transactions.",
@@ -170,56 +162,55 @@ export function RecurringTransactionDialog({
         created_at: mode === 'create' ? new Date().toISOString() : undefined,
         updated_at: new Date().toISOString(),
       }
+      
+      console.log(`Processing ${mode} recurring transaction:`, submissionData);
 
       // Pass the data to the transaction service based on mode
       if (mode === 'create') {
         await transactionService.createRecurringTransaction(submissionData)
+        
+        toast.success(`Created recurring transaction`, {
+          description: "Your recurring transaction has been successfully saved.",
+        })
+        
         // Reset form and close dialog after successful creation
         form.reset()
         onClose()
-      } else if (mode === 'edit') {
-        // For edit mode, we call the onSubmit handler with the formatted data
-        // The parent component will handle the actual API call
+      } else if (mode === 'edit' && initialData && initialData.id) {
+        // For edit mode, use the transactionService directly if onSubmit is not provided
         if (onSubmit) {
-          try {
-            // Convert dates back to Date objects for the form values
-            const formattedData: RecurringTransactionFormValues = {
-              name: data.name,
-              amount: data.amount,
-              type: data.type,
-              account_type: data.account_type,
-              category_id: data.category_id,
-              frequency: data.frequency,
-              description: data.description,
-              // Keep the original Date objects from the form
-              start_date: data.start_date,
-              end_date: data.end_date,
-            }
-            
-            // Pass the properly formatted data to onSubmit
-            // We're not closing the dialog here - let the parent component handle that
-            // after the update is complete
-            await onSubmit(formattedData)
-            
-            // Don't close the dialog here - the parent will handle it
-            // This allows the loading state to be visible
-          } catch (error) {
-            console.error('Error in onSubmit handler:', error)
-            toast.error('Failed to update transaction')
-            // Reset isSubmitting state on error
-            setIsSubmitting(false)
-          }
+          // Pass the data to the parent component
+          await onSubmit(data)
+        } else {
+          // Use transaction service directly if no onSubmit handler is provided
+          // This is the critical fix - directly call the service if no custom handler
+          const updateData: UpdateRecurringTransaction = {
+            name: data.name,
+            amount: data.amount,
+            type: data.type,
+            account_type: data.account_type,
+            category_id: data.category_id ? parseInt(data.category_id) : 1,
+            description: data.description,
+            frequency: data.frequency,
+            start_date: formatDate(data.start_date) as string,
+            end_date: formatDate(data.end_date) || null,
+            updated_at: new Date().toISOString(),
+          };
+          
+          await transactionService.updateRecurringTransaction(
+            initialData.id, 
+            updateData, 
+            user.id
+          );
         }
+        
+        toast.success(`Updated recurring transaction`, {
+          description: "Your recurring transaction has been successfully updated.",
+        })
+        
+        // Close dialog after successful update
+        onClose()
       }
-
-      toast.success(`${mode === 'create' ? 'Created' : 'Updated'} recurring transaction`, {
-        description: "Your recurring transaction has been successfully saved.",
-      })
-
-      if (onSubmit) {
-        onSubmit(data)
-      }
-      onClose()
     } catch (error) {
       console.error('Failed to submit recurring transaction:', error)
       toast.error("Failed to save recurring transaction", {
@@ -274,13 +265,12 @@ export function RecurringTransactionDialog({
                   <FormItem>
                     <FormLabel>Name</FormLabel>
                     <FormControl>
-                      <Input placeholder="Transaction name" {...field} />
+                      <Input placeholder="e.g., Rent, Netflix, Salary" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-
               <FormField
                 control={form.control}
                 name="amount"
@@ -288,11 +278,12 @@ export function RecurringTransactionDialog({
                   <FormItem>
                     <FormLabel>Amount</FormLabel>
                     <FormControl>
-                      <Input 
-                        type="number" 
-                        placeholder="0.00" 
-                        {...field} 
-                        onChange={e => field.onChange(parseFloat(e.target.value))}
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="0.00"
+                        {...field}
+                        onChange={(e) => field.onChange(parseFloat(e.target.value))}
                       />
                     </FormControl>
                     <FormMessage />
@@ -307,7 +298,7 @@ export function RecurringTransactionDialog({
                 control={form.control}
                 name="start_date"
                 render={({ field }) => (
-                  <FormItem>
+                  <FormItem className="flex flex-col">
                     <FormLabel>Start Date</FormLabel>
                     <Popover>
                       <PopoverTrigger asChild>
@@ -330,9 +321,6 @@ export function RecurringTransactionDialog({
                           mode="single"
                           selected={field.value}
                           onSelect={field.onChange}
-                          disabled={(date) =>
-                            date < new Date("1900-01-01")
-                          }
                           initialFocus
                         />
                       </PopoverContent>
@@ -341,7 +329,6 @@ export function RecurringTransactionDialog({
                   </FormItem>
                 )}
               />
-
               <FormField
                 control={form.control}
                 name="type"
@@ -351,7 +338,7 @@ export function RecurringTransactionDialog({
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select type" />
+                          <SelectValue placeholder="Select a type" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
@@ -366,23 +353,22 @@ export function RecurringTransactionDialog({
                   </FormItem>
                 )}
               />
-
               <FormField
                 control={form.control}
                 name="account_type"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Account Type</FormLabel>
+                    <FormLabel>Account</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select account type" />
+                          <SelectValue placeholder="Select an account" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {accountTypes.map((type) => (
-                          <SelectItem key={type.value} value={type.value}>
-                            {type.label}
+                        {accountTypes.map((account) => (
+                          <SelectItem key={account.value} value={account.value}>
+                            {account.label}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -404,39 +390,31 @@ export function RecurringTransactionDialog({
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select category" />
+                          <SelectValue placeholder="Select a category" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {categories?.length > 0 ? (
-                          categories.map((category: { id: number; name: string }) => (
-                            <SelectItem key={category.id} value={category.id.toString()}>
-                              {category.name}
-                            </SelectItem>
-                          ))
-                        ) : (
-                          <SelectItem value="1">Uncategorized</SelectItem>
-                        )}
+                        {categories.map((category) => (
+                          <SelectItem key={category.id.toString()} value={category.id.toString()}>
+                            {category.name}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-
               <FormField
                 control={form.control}
                 name="frequency"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Frequency</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                    >
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select frequency" />
+                          <SelectValue placeholder="Select a frequency" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>

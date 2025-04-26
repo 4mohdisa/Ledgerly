@@ -38,18 +38,12 @@ import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
 import { transactionTypes, TransactionType } from "@/data/transactiontypes"
-import { accountTypes, AccountType } from "@/data/account-types"
 import { frequencies, FrequencyType } from "@/data/frequencies"
+import { useCategories } from "@/hooks/use-categories"
+import { accountTypes, AccountType } from "@/data/account-types"
 import { transactionService } from '@/app/services/transaction-services'
-import { Transaction } from '@/app/types/transaction'
 import { BaseDialogProps, TransactionFormValues, transactionSchema } from '../shared/schema'
-import { createClient } from '@/utils/supabase/client'
-import { User } from '@supabase/supabase-js'
 import { useAuth } from '@/context/auth-context'
-
-// Redux imports
-import { useAppDispatch, useAppSelector } from '@/redux/hooks'
-import { fetchCategories } from '@/redux/slices/categoriesSlice'
 
 interface TransactionDialogProps extends Omit<BaseDialogProps, 'mode'> {
   initialData?: Partial<TransactionFormValues>;
@@ -65,70 +59,8 @@ export function TransactionDialog({
   mode = 'create'
 }: TransactionDialogProps) {
   const { user } = useAuth()
-  
-  // Use Redux state for categories
-  const dispatch = useAppDispatch()
-  const { items: categories, status: categoriesStatus } = useAppSelector((state: any) => state.categories)
-  const categoriesLoading = categoriesStatus === 'loading'
-  const categoriesError = useAppSelector((state: any) => state.categories.error)
-  
-  // Local state for categories to ensure they're available even if Redux state is delayed
-  const [localCategories, setLocalCategories] = useState<Array<{id: number, name: string}>>([])
-  
-  // Fetch categories when component mounts or dialog opens
-  useEffect(() => {
-    if (user && isOpen) {
-      // Always fetch fresh categories when the dialog opens
-      dispatch(fetchCategories(user.id));
-      
-      // Fallback: Fetch categories directly if Redux state is empty
-      if (!categories || categories.length === 0) {
-        const fetchCategoriesDirectly = async () => {
-          try {
-            const supabase = createClient();
-            // Fetch ALL categories without any filtering
-            const { data, error } = await supabase
-              .from('categories')
-              .select('id, name')
-              .order('name');
-              
-            console.log(`Retrieved ${data?.length || 0} categories from database`);
-            
-            // No need to filter by user_id - we want to show all categories
-              
-            if (error) throw error;
-            if (data && data.length > 0) {
-              setLocalCategories(data);
-            }
-          } catch (err) {
-            console.error('Error fetching categories directly:', err);
-          }
-        };
-        
-        fetchCategoriesDirectly();
-      }
-    }
-  }, [user, isOpen, dispatch, categories])
-  
-  // Sync Redux categories to local state when they change
-  useEffect(() => {
-    if (categories && categories.length > 0) {
-      console.log(`Syncing ${categories.length} categories to local state`);
-      setLocalCategories(categories.map((cat: { id: number; name: string }) => ({
-        id: cat.id,
-        name: cat.name
-      })));
-    }
-  }, [categories])
-  
-  // Log local categories whenever they change
-  useEffect(() => {
-    console.log(`Local categories count: ${localCategories.length}`);
-    if (localCategories.length > 0) {
-      console.log('First few categories:', localCategories.slice(0, 3));
-      console.log('Last few categories:', localCategories.slice(-3));
-    }
-  }, [localCategories])
+  const { categories, loading: categoriesLoading, error: categoriesError } = useCategories()
+  console.log('TransactionDialog - categories:', { categories, loading: categoriesLoading, error: categoriesError })
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const form = useForm<TransactionFormValues>({
@@ -149,7 +81,7 @@ export function TransactionDialog({
   // Reset form when initialData changes or dialog opens
   useEffect(() => {
     if (isOpen && initialData) {
-
+      console.log('Resetting form with initialData:', initialData)
       // Reset the form with the new values
       form.reset({
         name: "",
@@ -186,8 +118,13 @@ export function TransactionDialog({
 
       // Validate and log category selection
       const categoryId = Number(data.category_id)
-      const selectedCategory = categories.find((cat: { id: number; name: string }) => cat.id === categoryId)
-
+      const selectedCategory = categories.find(cat => cat.id === categoryId)
+      console.log('Category validation:', {
+        categoryId,
+        selectedCategory,
+        allCategories: categories.map(c => ({ id: c.id, name: c.name }))
+      })
+      
       if (!selectedCategory) {
         throw new Error(`Category ${categoryId} not found. Please select a valid category.`)
       }
@@ -198,7 +135,7 @@ export function TransactionDialog({
       // Check if we're in edit mode - if so, we don't create a new transaction
       // Instead, we'll just pass the data to the parent component via onSubmit
       if (mode === 'edit') {
-
+        console.log('Edit mode - passing data to parent component', data)
         // We don't need to do anything here - just pass the data to the parent
         // component which will handle the update
         result = { success: true }
@@ -407,6 +344,7 @@ export function TransactionDialog({
                           onSelect={(date) => {
                             if (date) {
                               field.onChange(date)
+                              form.setValue('date', date)
                             }
                           }}
                           disabled={(date) =>
@@ -486,31 +424,12 @@ export function TransactionDialog({
                           <SelectValue placeholder="Select category" />
                         </SelectTrigger>
                       </FormControl>
-                      {/* Override the default SelectContent to ensure proper scrolling */}
-                      <SelectContent 
-                        className=""
-                        position="popper"
-                        sideOffset={8}
-                      >
-                        <div className="max-h-[200px] overflow-y-auto py-1">
-                        {categoriesLoading && localCategories.length === 0 ? (
-                          <SelectItem value="loading" disabled>
-                            Loading categories...
+                      <SelectContent>
+                        {categories?.map((category) => (
+                          <SelectItem key={category.id} value={String(category.id)}>
+                            {category.name}
                           </SelectItem>
-                        ) : categoriesError && localCategories.length === 0 ? (
-                          <SelectItem value="error" disabled>
-                            Error loading categories
-                          </SelectItem>
-                        ) : localCategories.length > 0 ? (
-                          localCategories.map((cat: { id: number; name: string }) => (
-                            <SelectItem key={cat.id} value={cat.id.toString()}>
-                              {cat.name}
-                            </SelectItem>
-                          ))
-                        ) : (
-                          <SelectItem value="1">Uncategorized</SelectItem>
-                        )}
-                        </div>
+                        ))}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -532,7 +451,7 @@ export function TransactionDialog({
                       </FormControl>
                       <SelectContent>
                         <SelectItem value="Never">One-time Transaction</SelectItem>
-                        {frequencies.map((freq: { value: FrequencyType; label: string }) => (
+                        {frequencies.map((freq) => (
                           <SelectItem key={freq.value} value={freq.value}>
                             {freq.label}
                           </SelectItem>
