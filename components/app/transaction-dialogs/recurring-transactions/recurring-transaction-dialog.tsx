@@ -42,7 +42,6 @@ import { frequencies, FrequencyType } from "@/data/frequencies"
 import { categories } from "@/data/categories"
 import { accountTypes } from "@/data/account-types"
 import { transactionService } from '@/app/services/transaction-services'
-import { RecurringTransaction, UpdateRecurringTransaction } from '@/app/types/transaction'
 import { BaseDialogProps, RecurringTransactionFormValues, recurringTransactionSchema } from '../shared/schema'
 import { createClient } from '@/utils/supabase/client'
 import { User } from '@supabase/supabase-js'
@@ -136,46 +135,45 @@ export function RecurringTransactionDialog({
     setIsSubmitting(true)
 
     try {
-      // Format dates to ISO string format
-      const formatDate = (date: Date | undefined): string | undefined => {
-        return date ? date.toISOString() : undefined;
-      };
+      const formatDate = (date: Date | undefined): string | undefined =>
+        date ? date.toISOString() : undefined
 
-      // Prepare the form data with proper types
-      const submissionData = {
-        ...data,
-        // Add the user_id from the authenticated user
-        user_id: user.id,
-        // Ensure category_id is properly parsed as a number
-        category_id: data.category_id ? parseInt(data.category_id) : 1,
-        // Convert Date objects to ISO strings
-        start_date: formatDate(data.start_date) as string,
-        end_date: formatDate(data.end_date),
-        created_at: mode === 'create' ? new Date().toISOString() : undefined,
-        updated_at: new Date().toISOString(),
-      }
-
-      // Pass the data to the transaction service based on mode
       if (mode === 'create') {
+        // Prepare data for creation
+        const submissionData = {
+          ...data,
+          user_id: user.id,
+          category_id: data.category_id ? parseInt(data.category_id, 10) : 1,
+          start_date: formatDate(data.start_date) as string,
+          end_date: formatDate(data.end_date),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }
+
         await transactionService.createRecurringTransaction(submissionData)
-      } else if (mode === 'edit') {
-        // For edit mode, we need to call the update function
-        // The onSubmit handler in the parent component will handle the actual API call
-        // We just need to pass the formatted data back
       }
 
-      toast.success(`${mode === 'create' ? 'Created' : 'Updated'} recurring transaction`, {
-        description: "Your recurring transaction has been successfully saved.",
-      })
-
+      // Always invoke the parent callback if provided and wait for it to finish
       if (onSubmit) {
-        onSubmit(data)
+        await onSubmit(data)
       }
-      onClose()
+
+      toast.success(
+        `${mode === 'create' ? 'Created' : 'Updated'} recurring transaction`,
+        {
+          description: 'Your recurring transaction has been successfully saved.',
+        }
+      )
+
+      // Only close the dialog automatically in create mode; for edit mode
+      // the parent component controls the open state so we leave it to that.
+      if (mode === 'create') {
+        onClose()
+      }
     } catch (error) {
       console.error('Failed to submit recurring transaction:', error)
-      toast.error("Failed to save recurring transaction", {
-        description: error instanceof Error ? error.message : "Please try again.",
+      toast.error('Failed to save recurring transaction', {
+        description: error instanceof Error ? error.message : 'Please try again.',
       })
     } finally {
       setIsSubmitting(false)

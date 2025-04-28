@@ -22,23 +22,18 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { createClient } from "@/utils/supabase/client";
 
-// Redux imports
-import { useAppDispatch, useAppSelector } from '@/redux/hooks';
-import { 
-  fetchRecurringTransactions, 
-  fetchUpcomingTransactions,
-  createRecurringTransaction,
-  updateRecurringTransaction,
-  deleteRecurringTransaction
-} from '@/redux/slices/recurringTransactionsSlice';
-import { setDateRange } from '@/redux/slices/uiSlice';
+// Import transaction service
+import { transactionService } from '@/app/services/transaction-services';
+
+// Only keep fetchUpcomingTransactions from Redux
+import { fetchUpcomingTransactions } from '@/redux/slices/recurringTransactionsSlice';
 
 export default function RecurringTransactionsPage() {
-  // Redux state and dispatch
-  const dispatch = useAppDispatch();
-  const { items: recurringTransactions, status: recurringStatus } = useAppSelector((state: any) => state.recurringTransactions);
-  const { upcomingTransactions, upcomingStatus } = useAppSelector((state: any) => state.recurringTransactions);
-  const { dateRange: reduxDateRange } = useAppSelector((state: any) => state.ui);
+  // Local state for transactions and UI
+  const [recurringTransactions, setRecurringTransactions] = useState<RecurringTransaction[]>([]);
+  const [upcomingTransactions, setUpcomingTransactions] = useState<Transaction[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [dateRange, setLocalDateRange] = useState<DateRange | undefined>();
   
   // Local state
   const [isAddTransactionOpen, setIsAddTransactionOpen] = useState(false);
@@ -46,44 +41,82 @@ export default function RecurringTransactionsPage() {
   const [editingRecurringTransaction, setEditingRecurringTransaction] = useState<RecurringTransaction | null>(null);
   const [user, setUser] = useState<any>(null);
   const supabase = createClient();
+
+  // Function to fetch recurring transactions data
+  const fetchRecurringTransactionsData = useCallback(async () => {
+    if (!user?.id) return;
+    
+    setIsLoading(true);
+    try {
+      const data = await transactionService.getRecurringTransactions(user.id);
+      setRecurringTransactions(data as RecurringTransaction[]);
+    } catch (error) {
+      console.error("Error fetching recurring transactions:", error);
+      toast.error("Failed to load recurring transactions");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user]);
   
-  // Determine loading state from Redux
-  const loading = recurringStatus === 'loading' || recurringStatus === 'idle' || upcomingStatus === 'loading';
-
-  // Refresh upcoming transactions when recurring transactions change
-  useEffect(() => {
-    if (user?.id) {
-      dispatch(fetchUpcomingTransactions(user.id));
+  // Function to fetch upcoming transactions data
+  const fetchUpcomingTransactionsData = useCallback(async () => {
+    if (!user?.id) return;
+    
+    try {
+      // Need to cast to unknown first due to type mismatch between predicted transactions and Transaction type
+      const data = await transactionService.predictUpcomingTransactions(user.id);
+      setUpcomingTransactions(data as unknown as Transaction[]);
+    } catch (error) {
+      console.error("Error fetching upcoming transactions:", error);
+      toast.error("Failed to load upcoming transactions");
     }
-  }, [dispatch, user]);
-  
-  const loadUpcomingTransactions = useCallback(() => {
-    if (user?.id) {
-      dispatch(fetchUpcomingTransactions(user.id));
-    }
-  }, [dispatch, user]);
+  }, [user]);
 
-  // Redux action dispatchers
-  const loadRecurringTransactions = useCallback(() => {
-    if (user?.id) {
-      dispatch(fetchRecurringTransactions(user.id));
+  // Handle add success
+  const handleAddSuccess = useCallback(async (formData: any) => {
+    if (!user) {
+      toast.error("Authentication required");
+      return Promise.reject("Authentication required");
     }
-  }, [dispatch, user]);
+    
+    try {
+      // Use transaction service directly
+      const submissionData = {
+        ...formData,
+        user_id: user.id,
+        category_id: formData.category_id ? parseInt(formData.category_id, 10) : 1,
+        start_date: formData.start_date,
+        end_date: formData.end_date,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      
+      // Create the recurring transaction using the service
+      const result = await transactionService.createRecurringTransaction(submissionData);
+      
+      toast.success("Transaction created successfully");
+      
+      // Refresh data
+      fetchRecurringTransactionsData();
+      fetchUpcomingTransactionsData();
+      
+      return Promise.resolve();
+    } catch (error) {
+      console.error("Error creating transaction:", error);
+      toast.error("Failed to create transaction");
+      return Promise.reject(error);
+    }
+  }, [user, fetchRecurringTransactionsData, fetchUpcomingTransactionsData]);
 
-  // Handle edit and delete functions using Redux
-  const handleEditSuccess = useCallback(async (transaction: RecurringTransaction): Promise<void> => {
+  // Handle edit success using transaction service
+  const handleEditSuccess = useCallback(async (transaction: RecurringTransaction) => {
     if (!user || !transaction.id) {
       toast.error("Cannot update transaction: Missing user or transaction ID");
-      return Promise.reject(new Error("Missing user or transaction ID"));
+      return Promise.reject("Missing user or transaction ID");
     }
     
-    console.log('Updating transaction:', transaction);
-    
-    // Ensure we have a clean transaction object without any extra properties
-    // We'll omit user_id from the update data since it's a UUID and only used for filtering
-    // This prevents type conversion errors in Supabase
-    const cleanTransaction: Omit<RecurringTransaction, 'user_id'> = {
-      id: transaction.id,
+    // Clean up the transaction object - only include fields we want to update
+    const cleanTransaction = {
       name: transaction.name,
       amount: transaction.amount,
       type: transaction.type,
@@ -93,7 +126,6 @@ export default function RecurringTransactionsPage() {
       frequency: transaction.frequency,
       start_date: transaction.start_date,
       end_date: transaction.end_date,
-      created_at: transaction.created_at,
       updated_at: new Date().toISOString()
     };
     
@@ -101,52 +133,55 @@ export default function RecurringTransactionsPage() {
     toast.loading("Updating transaction...");
     
     try {
-      // Dispatch the update action
-      const updateAction = dispatch(updateRecurringTransaction({ 
+      console.log('Updating recurring transaction with service:', { 
         id: transaction.id, 
-        data: cleanTransaction,
-        userId: user.id
-      }));
+        data: cleanTransaction, 
+        userId: user.id 
+      });
       
-      const result = await updateAction.unwrap();
+      // Use transaction service
+      const updatedTransaction = await transactionService.updateRecurringTransaction(
+        transaction.id as number,
+        cleanTransaction,
+        user.id
+      );
       
-      console.log('Update result:', result);
+      console.log('Update successful:', updatedTransaction);
       
       // Dismiss loading toast and show success
       toast.dismiss();
       toast.success("Transaction updated successfully");
       
       // Refresh data
-      dispatch(fetchUpcomingTransactions(user.id));
-      dispatch(fetchRecurringTransactions(user.id));
+      fetchRecurringTransactionsData();
+      fetchUpcomingTransactionsData();
       
       return Promise.resolve();
     } catch (error) {
       console.error("Error updating transaction:", error);
-      toast.dismiss(); // Dismiss any loading toast
-      toast.error(typeof error === 'string' ? error : "Failed to update transaction");
-      return Promise.reject(error);
+      toast.dismiss(); // Dismiss loading toast
+      toast.error("Failed to update transaction");
+      throw error; // Re-throw to let the dialog component handle it
     }
-  }, [user, dispatch]);
-  
+  }, [user]);
+
   const handleDeleteRecurringTransaction = useCallback(async (id: number) => {
     try {
       if (!user) return;
       
-      // Dispatch the delete action
-      await dispatch(deleteRecurringTransaction({ 
-        id, 
-        userId: user.id 
-      })).unwrap();
+      // Use transaction service directly
+      await transactionService.deleteRecurringTransaction(id, user.id);
       
       toast.success("Transaction deleted successfully");
-      // Refresh upcoming transactions after delete
-      dispatch(fetchUpcomingTransactions(user.id));
+      
+      // Refresh data after delete
+      fetchRecurringTransactionsData();
+      fetchUpcomingTransactionsData();
     } catch (error) {
       console.error("Error deleting transaction:", error);
       toast.error("Failed to delete transaction");
     }
-  }, [user, dispatch]);
+  }, [user]);
 
   // Handle table edit and delete
   const handleTableEdit = useCallback((id: number, data: Partial<Transaction>) => {
@@ -182,9 +217,9 @@ export default function RecurringTransactionsPage() {
 
         setUser(user);
 
-        // Dispatch Redux actions to fetch data
-        dispatch(fetchRecurringTransactions(user.id));
-        dispatch(fetchUpcomingTransactions(user.id));
+        // Fetch data using our functions
+        fetchRecurringTransactionsData();
+        fetchUpcomingTransactionsData();
       } catch (error) {
         console.error("Error fetching user:", error);
         toast.error("Failed to load user data");
@@ -192,46 +227,26 @@ export default function RecurringTransactionsPage() {
     };
 
     fetchUserAndInitializeData();
-  }, [dispatch]);
+  }, [supabase.auth]);
 
   const handleDateRangeChange = useCallback((newDateRange: DateRange | undefined) => {
     if (!newDateRange || !newDateRange.from) {
-      dispatch(setDateRange(null as any));
+      setLocalDateRange(undefined);
       return;
     }
 
-    // Use the exact dates selected by the user and dispatch to Redux
-    dispatch(setDateRange({
-      from: newDateRange.from.toISOString(),
-      to: newDateRange.to ? newDateRange.to.toISOString() : null
-    } as any));
-  }, [dispatch]);
+    const range: DateRange = {
+      from: newDateRange.from,
+      to: newDateRange.to || newDateRange.from
+    };
+    
+    setLocalDateRange(range);
+    fetchUpcomingTransactionsData();
+  }, [fetchUpcomingTransactionsData]);
 
   const handleAddTransaction = useCallback(async () => {
     setIsAddTransactionOpen(true);
   }, []);
-
-  const handleAddSuccess = useCallback(async (formData: any) => {
-    try {
-      if (!user) return;
-      
-      // Dispatch the create action
-      await dispatch(createRecurringTransaction({
-        ...formData,
-        user_id: user.id
-      })).unwrap();
-      
-      toast.success("Recurring transaction created", {
-        description: "Your recurring transaction has been successfully created.",
-      });
-
-      // Refresh upcoming transactions
-      dispatch(fetchUpcomingTransactions(user.id));
-    } catch (error) {
-      console.error("Error creating transaction:", error);
-      toast.error("Failed to create transaction");
-    }
-  }, [user, dispatch]);
 
   return (
     <div className="h-full flex flex-col">
@@ -239,7 +254,7 @@ export default function RecurringTransactionsPage() {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <h1 className="text-3xl font-bold">Recurring Transactions</h1>
           <div className="flex flex-col md:flex-row items-end md:items-center gap-4">
-            <DateRangePickerWithRange dateRange={reduxDateRange} onDateRangeChange={handleDateRangeChange} />
+            <DateRangePickerWithRange dateRange={dateRange} onDateRangeChange={handleDateRangeChange} />
             <div className="flex gap-4 ml-auto">
               <div className="md:hidden w-full">
                 <DropdownMenu>
@@ -269,7 +284,7 @@ export default function RecurringTransactionsPage() {
         <div>
           <h2 className="text-xl font-semibold mb-4">Active Recurring Transactions</h2>
             <TransactionsTable
-              loading={loading}
+              loading={isLoading}
               data={recurringTransactions.map((rt: any) => {
                 // Extract category name from the joined categories data
                 const categoryName = rt.categories?.name || '';
@@ -301,7 +316,7 @@ export default function RecurringTransactionsPage() {
                 order: "desc"
               }}
               className="h-full"
-              dateRange={reduxDateRange as DateRange | undefined}
+              dateRange={dateRange}
               type="recurring"
               onDelete={handleDeleteRecurringTransaction}
               onEdit={(id, data) => handleTableEdit(id, data)}
