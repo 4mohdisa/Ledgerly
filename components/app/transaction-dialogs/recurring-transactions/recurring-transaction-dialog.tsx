@@ -37,17 +37,18 @@ import {
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
-import { transactionTypes } from "@/data/transactiontypes"
+import { transactionTypes, TransactionType } from "@/data/transactiontypes"
 import { frequencies, FrequencyType } from "@/data/frequencies"
 import { categories } from "@/data/categories"
-import { accountTypes } from "@/data/account-types"
+import { accountTypes, AccountType } from "@/data/account-types"
 import { transactionService } from '@/app/services/transaction-services'
 import { BaseDialogProps, RecurringTransactionFormValues, recurringTransactionSchema } from '../shared/schema'
 import { createClient } from '@/utils/supabase/client'
 import { User } from '@supabase/supabase-js'
 
-interface RecurringTransactionDialogProps extends BaseDialogProps {
+interface RecurringTransactionDialogProps extends Omit<BaseDialogProps, 'initialData'> {
   onSubmit?: (data: RecurringTransactionFormValues) => void
+  initialData?: Partial<RecurringTransactionFormValues>
 }
 
 function useUser() {
@@ -107,18 +108,25 @@ export function RecurringTransactionDialog({
   useEffect(() => {
     if (isOpen && initialData) {
       console.log('Resetting form with initialData:', initialData)
-      // Reset the form with the initial values plus any new initialData
-      form.reset({
-        name: "",
-        description: "",
-        amount: 0,
-        type: "Expense",
-        account_type: "Cash",
-        category_id: "",
-        frequency: "Monthly" as FrequencyType,
-        start_date: new Date(),
-        ...initialData
-      })
+      
+      // Ensure all required fields have valid values
+      const formattedData: RecurringTransactionFormValues = {
+        // Default values
+        name: initialData.name || "",
+        description: initialData.description || "",
+        amount: initialData.amount || 0,
+        // Ensure these values match exactly what's in the data arrays
+        type: (initialData.type || "Expense") as TransactionType,
+        account_type: (initialData.account_type || "Cash") as AccountType,
+        category_id: initialData.category_id?.toString() || "",
+        frequency: (initialData.frequency || "Monthly") as FrequencyType,
+        // Handle dates properly
+        start_date: initialData.start_date ? new Date(initialData.start_date) : new Date(),
+        end_date: initialData.end_date ? new Date(initialData.end_date) : undefined
+      }
+      
+      console.log('Formatted form data:', formattedData)
+      form.reset(formattedData)
     }
   }, [form, initialData, isOpen])
 
