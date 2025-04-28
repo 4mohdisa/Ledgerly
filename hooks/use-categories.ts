@@ -24,38 +24,23 @@ export function useCategories() {
       try {
         setLoading(true);
         
-        // Get the current user
+        // Get the current user session (for authentication purposes only)
         const { data: { session } } = await supabase.auth.getSession();
         
         if (!session) {
           throw new Error('No active session found');
         }
 
-        // Fetch categories for the user - try both string and number user_id
-        const userId = session.user.id;
-        
-        // Try to fetch with string user_id first
-        let { data, error } = await supabase
+        // Simply fetch all categories without any user_id filtering
+        // Categories are the same for all users
+        const { data, error } = await supabase
           .from('categories')
           .select('*')
-          .eq('user_id', userId as any)
           .order('name', { ascending: true });
         
         if (error) {
-          console.error('Error fetching categories with string ID:', error);
-          
-          // Try with numeric user_id as fallback
-          const numericUserId = parseInt(userId, 10);
-          if (!isNaN(numericUserId)) {
-            const result = await supabase
-              .from('categories')
-              .select('*')
-              .eq('user_id', numericUserId as any)
-              .order('name', { ascending: true });
-            
-            data = result.data;
-            error = result.error;
-          }
+          console.error('Error fetching categories:', error);
+          throw error;
         }
         
         if (error) throw error;

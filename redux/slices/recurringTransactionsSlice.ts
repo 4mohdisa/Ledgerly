@@ -278,13 +278,17 @@ export const updateRecurringTransaction = createAsyncThunk<RecurringTransaction,
   'recurringTransactions/updateRecurringTransaction',
   async ({ id, data, userId }, { rejectWithValue }) => {
     try {
+      console.log('updateRecurringTransaction action called with:', { id, data, userId });
+      
       const supabase = createClient();
+      
       // Convert any Date objects to ISO strings before updating
       // Also ensure we're not updating user_id as it's a UUID and used as a filter
-      const { user_id, ...dataWithoutUserId } = data;
+      const { user_id, id: dataId, ...dataWithoutIds } = data as any;
       
+      // Format the data for Supabase
       const formattedData = {
-        ...dataWithoutUserId,
+        ...dataWithoutIds,
         start_date: data.start_date instanceof Date 
           ? data.start_date.toISOString() 
           : data.start_date,
@@ -296,12 +300,17 @@ export const updateRecurringTransaction = createAsyncThunk<RecurringTransaction,
       // Ensure id is a number for the database query
       const numericId = typeof id === 'string' ? parseInt(id, 10) : id;
       
-      console.log('Updating recurring transaction in Supabase:', { id: numericId, formattedData, userId });
+      console.log('Updating recurring transaction in Supabase:', { 
+        id: numericId, 
+        formattedData, 
+        userId,
+        url: '/rest/v1/recurring_transactions' // Can't access supabaseUrl directly
+      });
       
       // Use select() to get the updated record back
       const { data: updatedTransaction, error } = await supabase
         .from('recurring_transactions')
-        .update(formattedData as any) // Type assertion for Supabase typing issue
+        .update(formattedData)
         .eq('id', numericId)
         .eq('user_id', userId)
         .select('*, categories(name)')
